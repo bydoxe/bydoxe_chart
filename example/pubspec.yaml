@@ -12,7 +12,7 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.0.0
-  k_chart_plus:
+  bydoxe_chart:
     path: ../
 
 dev_dependencies:
