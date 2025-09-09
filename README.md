@@ -43,6 +43,8 @@ dependencies:
 
 ### 1) KChartWidget (캔들/라인 + 지표)
 
+첫 번째 인자는 `List<KLineEntity>` 타입의 `datas` 입니다.
+
 ```dart
 import 'package:flutter/material.dart';
 import 'package:bydoxe_chart/k_chart_plus.dart';
@@ -54,12 +56,12 @@ class KChartDemo extends StatefulWidget {
 }
 
 class _KChartDemoState extends State<KChartDemo> {
-  late final List<KLineEntity> data;
+  late final List<KLineEntity> datas;
 
   @override
   void initState() {
     super.initState();
-    data = [
+    datas = [
       KLineEntity.fromCustom(
         time: DateTime.now().millisecondsSinceEpoch,
         open: 100,
@@ -81,7 +83,7 @@ class _KChartDemoState extends State<KChartDemo> {
       // ... 더 많은 봉 데이터
     ];
     // 지표 데이터 계산(MA/BOLL/SAR/볼륨 MA/MACD/KDJ/RSI/WR/CCI)
-    DataUtil.calculate(data, [5, 10, 20]);
+    DataUtil.calculate(datas, [5, 10, 20]);
   }
 
   @override
@@ -93,7 +95,7 @@ class _KChartDemoState extends State<KChartDemo> {
         height: 360,
         width: double.infinity,
         child: KChartWidget(
-          data,
+          datas,
           ChartStyle()
             ..gridRows = 4
             ..gridColumns = 4,

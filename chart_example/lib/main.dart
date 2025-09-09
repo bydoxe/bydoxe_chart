@@ -106,6 +106,8 @@ class _MyHomePageState extends State<MyHomePage> {
                 secondaryStateLi: _secondaryStateLi.toSet(),
                 fixedLength: 2,
                 timeFormat: TimeFormat.YEAR_MONTH_DAY,
+                verticalTextAlignment: VerticalTextAlignment.right,
+                showNowPrice: true,
               ),
               if (showLoading)
                 Container(
