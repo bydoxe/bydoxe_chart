@@ -3,6 +3,23 @@ import 'package:flutter/material.dart' show Color;
 /// Action types for position line interactive buttons
 enum PositionAction { close, tp, sl }
 
+/// Trade markers (entry/exit)
+enum MarkerType { buy, sell }
+
+class PositionMarkerEntity {
+  final int id;
+  final int time; // in ms
+  final MarkerType type; // buy: entry(B), sell: exit(S)
+  final Color? color; // optional override
+
+  const PositionMarkerEntity({
+    required this.id,
+    required this.time,
+    required this.type,
+    this.color,
+  });
+}
+
 /// Position line configuration for KChartWidget
 class PositionLineEntity {
   /// Unique identifier for callbacks and selection

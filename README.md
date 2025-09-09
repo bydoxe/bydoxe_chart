@@ -293,6 +293,29 @@ KChartWidget(
 )
 ```
 
+### 마커(Markers)
+
+포지션 체결 이벤트를 B/S 마커로 표시합니다.
+
+- 속성: `markers: List<PositionMarkerEntity>`
+- 항목: `id:int`, `time:int(ms)`, `type: MarkerType.buy|sell`, `color`(선택)
+- 표기: `buy`는 해당 봉 아래에 B, `sell`은 해당 봉 위에 S가 배치됩니다.
+
+```dart
+final markers = <PositionMarkerEntity>[
+  PositionMarkerEntity(id: 101, time: datas[20].time!, type: MarkerType.buy),
+  PositionMarkerEntity(id: 102, time: datas[45].time!, type: MarkerType.sell),
+];
+
+KChartWidget(
+  datas,
+  ChartStyle(),
+  ChartColors(),
+  isTrendLine: false,
+  markers: markers,
+)
+```
+
 예시:
 
 ```dart

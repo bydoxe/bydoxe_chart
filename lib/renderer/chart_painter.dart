@@ -53,6 +53,7 @@ class ChartPainter extends BaseChartPainter {
   final BaseDimension baseDimension;
   final List<PositionLineEntity> positionLines;
   final PositionLabelAlignment positionLabelAlignment;
+  final List<PositionMarkerEntity> markers;
   int? activePositionId;
   Map<int, Rect> _hitLeftChip = {};
   Map<int, Rect> _hitBtnClose = {};
@@ -90,6 +91,7 @@ class ChartPainter extends BaseChartPainter {
     required this.nowPriceLabelAlignment,
     required this.positionLines,
     required this.positionLabelAlignment,
+    required this.markers,
     this.activePositionId,
     mainStateLi,
     volHidden,
@@ -219,6 +221,9 @@ class ChartPainter extends BaseChartPainter {
       mSecondaryRendererList.forEach((element) {
         element.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
       });
+
+      // render markers for this candle time
+      _drawMarkersForTime(canvas, curX, curPoint.time ?? 0, curPoint);
     }
 
     if ((isLongPress == true || (isTapShowInfoDialog && isOnTap)) &&
@@ -227,6 +232,47 @@ class ChartPainter extends BaseChartPainter {
     }
     if (isTrendLine == true) drawTrendLines(canvas, size);
     canvas.restore();
+  }
+
+  void _drawMarkersForTime(Canvas canvas, double x, int time, KLineEntity k) {
+    if (markers.isEmpty) return;
+    for (final m in markers) {
+      if (m.time != time) continue;
+      final Color color = m.color ??
+          ((m.type == MarkerType.buy)
+              ? chartColors.upColor
+              : chartColors.dnColor);
+      final String label = (m.type == MarkerType.buy) ? 'B' : 'S';
+      final TextPainter tp = getChipTextPainter(label, color);
+      const double padH = 4.0;
+      const double padV = 2.0;
+      final double w = tp.width + 2 * padH;
+      final double h = tp.height + 2 * padV;
+      final double centerX = x - w / 2;
+      double top;
+      if (m.type == MarkerType.buy) {
+        // below candle low
+        final double lowY = getMainY(k.low);
+        top = lowY + 4;
+      } else {
+        // above candle high
+        final double highY = getMainY(k.high);
+        top = highY - h - 4;
+      }
+      final RRect r = RRect.fromRectAndRadius(
+          Rect.fromLTWH(centerX, top, w, h), Radius.circular(3));
+      final Paint bg = Paint()
+        ..color = chartColors.bgColor
+        ..isAntiAlias = true;
+      final Paint bd = Paint()
+        ..style = PaintingStyle.stroke
+        ..color = color
+        ..strokeWidth = 1
+        ..isAntiAlias = true;
+      canvas.drawRRect(r, bg);
+      canvas.drawRRect(r, bd);
+      tp.paint(canvas, Offset(centerX + padH, top + padV));
+    }
   }
 
   @override
