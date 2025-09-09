@@ -211,6 +211,7 @@ class DepthChartDemo extends StatelessWidget {
 | chartTranslations | `ChartTranslations` | 정보창 라벨 텍스트 번역 값 |
 | timeFormat | `List<String>` | x축/정보창 시간 포맷. `TimeFormat.YEAR_MONTH_DAY` 등 |
 | nowPriceLabelAlignment | `NowPriceLabelAlignment` | 현재가 라벨 정렬: `followVertical`(수직축 정렬과 동일), `left`, `right` |
+| positionLabelAlignment | `PositionLabelAlignment` | 포지션 좌/우 라벨 정렬 기준(우측 가격칩은 우측 정렬, 좌측 포지션칩은 좌측 정렬을 기본으로 하되 이 옵션으로 동기화할 수 있음) |
 | onLoadMore | `Function(bool)?` | 좌/우 끝 도달 시 콜백. `true`=좌측, `false`=우측 끝 |
 | fixedLength | `int` | 가격/수치 소수 자릿수(기본 자동 유추, 수동 지정 가능) |
 | maDayList | `List<int>` | MA 계산 기간 목록(예: `[5,10,20]`) |
@@ -244,7 +245,45 @@ KChartWidget에서 보유 포지션의 평단가를 수평 라인으로 표시�
 
 - 속성: `positionLines: List<PositionLineEntity>`
 - 항목: `price`(필수), `isLong`(선택), `label`(선택), `color`(선택), `lineWidth`(선택)
-- 라벨 정렬: `nowPriceLabelAlignment`와 동일 규칙(`followVertical | left | right`)
+- `id`(필수): 라인/액션 콜백 식별자
+- 라벨 정렬: 가격 라벨은 `nowPriceLabelAlignment`, 포지션 좌측 칩은 `positionLabelAlignment` 규칙(`followVertical | left | right`)
+
+스타일(기본 구현)
+
+- 현재가 라벨: 둥근 사각형 칩(라운드 4), 텍스트/테두리 단일 색, 배경 `selectFillColor`, 점선은 마지막 봉의 x부터 라벨 가장자리까지만 표시
+  - 색상 설정: 텍스트/테두리/점선 컬러는 `ChartColors.nowPriceUpColor`(상승/하락 무관 동일 적용), 배경은 `ChartColors.selectFillColor`
+- 포지션 라인: 화면 가로 점선(`position.color`),
+  - 우측 가격 칩: 배경 `bgColor`, 테두리/텍스트 `position.color`, 현재가 라벨과 동일한 칩 크기 규칙(padH=6, padV=3, radius=4)
+  - 좌측 포지션 칩(2파트): 외곽선 `position.color`, 왼쪽 파트 배경 `position.color`(텍스트 흰색, "Long xx.xx%" 또는 "Short xx.xx%"), 오른쪽 파트 배경 `bgColor`(텍스트 `position.color`, 내용은 `label`)
+
+인터랙션(확장/액션 버튼)
+
+- 좌측 포지션 칩을 탭하면 해당 라인이 활성화되어 점선→실선으로 변경되고, 칩 오른쪽에 액션 버튼 3개가 나타납니다.
+  - 닫기(×), TP, SL 버튼
+  - 버튼 높이=칩 높이, 배경=`bgColor`, 테두리/텍스트=`position.color`
+- 각 버튼을 탭하면 `(id, action)` 형태로 콜백이 전달됩니다.
+
+```dart
+KChartWidget(
+  datas,
+  ChartStyle(),
+  ChartColors(),
+  isTrendLine: false,
+  positionLines: [
+    PositionLineEntity(
+      id: 'pos-1',
+      price: 103.25,
+      isLong: true,
+      label: 'BTCUSDT',
+      color: const Color(0xFF32D9F8),
+    ),
+  ],
+  onPositionAction: (id, action) {
+    // action: PositionAction.close | PositionAction.tp | PositionAction.sl
+    // id: PositionLineEntity.id
+  },
+)
+```
 
 예시:
 
@@ -260,7 +299,32 @@ KChartWidget(
   ChartColors(),
   isTrendLine: false,
   positionLines: positions,
-  nowPriceLabelAlignment: NowPriceLabelAlignment.followVertical, // 수직축 정렬과 동일하게 표시
+  nowPriceLabelAlignment: NowPriceLabelAlignment.right, // 현재가 라벨 우측 정렬(예시)
+  positionLabelAlignment: PositionLabelAlignment.left, // 포지션 좌측 칩 좌측 정렬(예시)
   verticalTextAlignment: VerticalTextAlignment.left,
 )
+```
+
+현재가 라벨 색상 설정 예시
+
+```dart
+final colors = ChartColors(
+  // 현재가 칩 텍스트/테두리/점선 컬러
+  nowPriceUpColor: const Color(0xFF32D9F8),
+  // 현재가 칩 배경 컬러
+  selectFillColor: const Color(0xFF0F1115),
+  // 차트 배경(우측 가격칩/포지션 칩 오른쪽 파트 배경으로도 사용)
+  bgColor: const Color(0xFF0F1115),
+);
+
+KChartWidget(
+  datas,
+  ChartStyle()
+    ..nowPriceLineLength = 4.5
+    ..nowPriceLineSpan = 3.5
+    ..nowPriceLineWidth = 1,
+  colors,
+  isTrendLine: false,
+  nowPriceLabelAlignment: NowPriceLabelAlignment.right,
+);
 ```

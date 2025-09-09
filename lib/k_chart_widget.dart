@@ -5,7 +5,7 @@ import 'package:bydoxe_chart/components/popup_info_view.dart';
 import 'package:bydoxe_chart/k_chart_plus.dart';
 import 'renderer/base_dimension.dart';
 import 'renderer/main_renderer.dart'
-    show NowPriceLabelAlignment, VerticalTextAlignment;
+    show NowPriceLabelAlignment, VerticalTextAlignment, PositionLabelAlignment;
 import 'entity/position_line_entity.dart';
 
 enum MainState { MA, BOLL, SAR }
@@ -60,6 +60,8 @@ class KChartWidget extends StatefulWidget {
   final VerticalTextAlignment verticalTextAlignment;
   final NowPriceLabelAlignment nowPriceLabelAlignment;
   final List<PositionLineEntity> positionLines;
+  final PositionLabelAlignment positionLabelAlignment;
+  final void Function(int id, PositionAction action)? onPositionAction;
   final bool isTrendLine;
   final double xFrontPadding;
 
@@ -91,6 +93,8 @@ class KChartWidget extends StatefulWidget {
     this.verticalTextAlignment = VerticalTextAlignment.left,
     this.nowPriceLabelAlignment = NowPriceLabelAlignment.followVertical,
     this.positionLines = const <PositionLineEntity>[],
+    this.positionLabelAlignment = PositionLabelAlignment.left,
+    this.onPositionAction,
     this.mBaseHeight = 360,
   });
 
@@ -109,6 +113,7 @@ class _KChartWidgetState extends State<KChartWidget>
 
   //For TrendLine
   List<TrendLine> lines = [];
+  int? activePositionId;
   double? changeinXposition;
   double? changeinYposition;
   double mSelectY = 0.0;
@@ -179,6 +184,7 @@ class _KChartWidgetState extends State<KChartWidget>
       verticalTextAlignment: widget.verticalTextAlignment,
       nowPriceLabelAlignment: widget.nowPriceLabelAlignment,
       positionLines: widget.positionLines,
+      positionLabelAlignment: widget.positionLabelAlignment,
     );
 
     return LayoutBuilder(
@@ -194,6 +200,11 @@ class _KChartWidgetState extends State<KChartWidget>
             if (!widget.isTrendLine &&
                 _painter.isInMainRect(details.localPosition)) {
               isOnTap = true;
+              // hit test position chips/buttons first
+              final hit = _hitTestPosition(details.localPosition, _painter);
+              if (hit != null) {
+                return;
+              }
               if (mSelectX != details.localPosition.dx &&
                   widget.isTapShowInfoDialog) {
                 mSelectX = details.localPosition.dx;
@@ -306,6 +317,45 @@ class _KChartWidgetState extends State<KChartWidget>
         );
       },
     );
+  }
+
+  // hit test against painter-stored rects
+  bool? _hitTestPosition(Offset pos, ChartPainter painter) {
+    // expose painter maps through getters
+    final left = painter.hitLeftChip;
+    final close = painter.hitBtnClose;
+    final tp = painter.hitBtnTp;
+    final sl = painter.hitBtnSl;
+
+    for (final e in left.entries) {
+      if (e.value.contains(pos)) {
+        // toggle active id
+        setState(() {
+          activePositionId = (activePositionId == e.key) ? null : e.key;
+          painter.activePositionId = activePositionId;
+        });
+        return true;
+      }
+    }
+    for (final e in close.entries) {
+      if (e.value.contains(pos)) {
+        widget.onPositionAction?.call(e.key, PositionAction.close);
+        return true;
+      }
+    }
+    for (final e in tp.entries) {
+      if (e.value.contains(pos)) {
+        widget.onPositionAction?.call(e.key, PositionAction.tp);
+        return true;
+      }
+    }
+    for (final e in sl.entries) {
+      if (e.value.contains(pos)) {
+        widget.onPositionAction?.call(e.key, PositionAction.sl);
+        return true;
+      }
+    }
+    return null;
   }
 
   void _stopAnimation({bool needNotify = true}) {

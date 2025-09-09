@@ -4,10 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:bydoxe_chart/k_chart_plus.dart';
 
-void main() => runApp(const MyApp());
+void main() => runApp(const DemoApp());
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class DemoApp extends StatelessWidget {
+  const DemoApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -17,21 +17,21 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.deepPurple,
         scaffoldBackgroundColor: const Color(0xFFF8F8F8),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const ChartExamplePage(title: 'Flutter Demo Home Page'),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, this.title}) : super(key: key);
+class ChartExamplePage extends StatefulWidget {
+  const ChartExamplePage({super.key, this.title});
 
   final String? title;
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<ChartExamplePage> createState() => _ChartExamplePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _ChartExamplePageState extends State<ChartExamplePage> {
   List<KLineEntity>? datas;
   bool showLoading = true;
   bool _volHidden = false;
@@ -41,7 +41,7 @@ class _MyHomePageState extends State<MyHomePage> {
   List<DepthEntity>? _bids, _asks;
 
   ChartStyle chartStyle = ChartStyle();
-  ChartColors chartColors = ChartColors();
+  ChartColors chartColors = ChartColors(nowPriceUpColor: Colors.black);
 
   @override
   void initState() {
@@ -88,6 +88,23 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final positions = <PositionLineEntity>[
+      PositionLineEntity(
+        id: 1, // 포지션 고유 ID
+        price: 110178.88, // 포지션 진입가격
+        label: "0.001", // 포지션 수량
+        color: Colors.red,
+        isLong: false,
+      ),
+      PositionLineEntity(
+        id: 2,
+        price: 116136.27,
+        label: "0.02",
+        color: Colors.green,
+        isLong: true,
+      ),
+    ];
+
     return Scaffold(
       body: ListView(
         shrinkWrap: true,
@@ -112,6 +129,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     NowPriceLabelAlignment.right, // 현재가 라벨 정렬
                 materialInfoDialog: true,
                 isLine: false,
+                positionLines: positions,
               ),
               if (showLoading)
                 Container(

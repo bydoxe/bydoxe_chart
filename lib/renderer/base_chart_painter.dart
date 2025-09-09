@@ -138,6 +138,8 @@ abstract class BaseChartPainter extends CustomPainter {
       drawText(canvas, datas!.last, 5);
       drawMaxAndMin(canvas);
       drawNowPrice(canvas);
+      // draw extra overlays (e.g., position lines) after now price label
+      drawOverlays(canvas, size);
 
       if (isLongPress == true || (isTapShowInfoDialog && isOnTap)) {
         drawCrossLineText(canvas, size);
@@ -178,6 +180,9 @@ abstract class BaseChartPainter extends CustomPainter {
 
   /// draw text of the cross line
   void drawCrossLineText(Canvas canvas, Size size);
+
+  /// draw extra overlays after now price and before cross line text
+  void drawOverlays(Canvas canvas, Size size) {}
 
   /// init the rectangle box to draw chart
   void initRect(Size size) {

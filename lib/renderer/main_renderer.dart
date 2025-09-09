@@ -7,6 +7,8 @@ enum VerticalTextAlignment { left, right }
 
 enum NowPriceLabelAlignment { followVertical, left, right }
 
+enum PositionLabelAlignment { followVertical, left, right }
+
 //For TrendLine
 double? trendLineMax;
 double? trendLineScale;

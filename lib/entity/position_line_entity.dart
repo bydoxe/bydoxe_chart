@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart' show Color;
 
+/// Action types for position line interactive buttons
+enum PositionAction { close, tp, sl }
+
 /// Position line configuration for KChartWidget
 class PositionLineEntity {
+  /// Unique identifier for callbacks and selection
+  final int id;
+
   /// Price level to draw the position line
   final double price;
 
@@ -20,6 +26,7 @@ class PositionLineEntity {
   final double lineWidth;
 
   const PositionLineEntity({
+    required this.id,
     required this.price,
     this.isLong,
     this.label,
