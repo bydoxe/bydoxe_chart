@@ -185,3 +185,52 @@ class DepthChartDemo extends StatelessWidget {
 ```
 
 롱프레스 상태에서 해당 지점의 가격/수량 팝업이 표시됩니다. 색상 테마는 `ChartColors`의 depth 관련 색상(`depthBuyColor`, `depthSellColor`, `depthBuyPathColor`, `depthSellPathColor`)을 조정하세요.
+
+## 속성 레퍼런스
+
+### KChartWidget
+
+| 이름 | 타입 | 설명 |
+|---|---|---|
+| datas | `List<KLineEntity>?` | 차트 데이터(OHLCV). `DataUtil.calculate`로 지표 필드 사전 계산 권장 |
+| chartStyle | `ChartStyle` | 패딩, 포인트/캔들 폭, 그리드, 현재가 라인 등 스타일 설정 |
+| chartColors | `ChartColors` | 배경/텍스트/상승·하락/지표/깊이/선택 영역 등 색상 팔레트 |
+| isTrendLine | `bool` | 트렌드라인 모드 활성화 여부(롱프레스 후 라인 기록/표시) |
+| xFrontPadding | `double` | 왼쪽 여백(스크롤 경계 계산에 반영) |
+| mainStateLi | `Set<MainState>` | 메인 지표 목록. `MA`, `BOLL`, `SAR` 중 다중 선택 가능 |
+| secondaryStateLi | `Set<SecondaryState>` | 보조 지표 목록. `MACD`, `KDJ`, `RSI`, `WR`, `CCI` 다중 선택 |
+| volHidden | `bool` | 거래량(Vol) 차트 숨김 여부 |
+| isLine | `bool` | 메인 차트를 라인 모드로 표시(기본은 캔들) |
+| isTapShowInfoDialog | `bool` | 탭으로 정보창 표시 활성화(롱프레스 십자선과 병행) |
+| hideGrid | `bool` | 그리드 라인 숨김 여부 |
+| showNowPrice | `bool` | 현재가 점선/라벨 표시 여부 |
+| showInfoDialog | `bool` | 정보창 위젯(`PopupInfoView`) 표시 여부 |
+| materialInfoDialog | `bool` | 정보창에 Material 래핑 적용 여부 |
+| chartTranslations | `ChartTranslations` | 정보창 라벨 텍스트 번역 값 |
+| timeFormat | `List<String>` | x축/정보창 시간 포맷. `TimeFormat.YEAR_MONTH_DAY` 등 |
+| onLoadMore | `Function(bool)?` | 좌/우 끝 도달 시 콜백. `true`=좌측, `false`=우측 끝 |
+| fixedLength | `int` | 가격/수치 소수 자릿수(기본 자동 유추, 수동 지정 가능) |
+| maDayList | `List<int>` | MA 계산 기간 목록(예: `[5,10,20]`) |
+| flingTime | `int` | 플링 애니메이션 지속(ms) |
+| flingRatio | `double` | 플링 속도 비율(관성 세기) |
+| flingCurve | `Curve` | 플링 커브(e.g. `Curves.decelerate`) |
+| isOnDrag | `Function(bool)?` | 드래그 상태 콜백. `true`=드래그 중, `false`=종료 |
+| verticalTextAlignment | `VerticalTextAlignment` | 수직축 값 라벨 정렬: `left` 또는 `right` |
+| mBaseHeight | `double` | 기준 높이. 내부적으로 볼륨/보조 섹션 높이 산출에 사용 |
+
+참고:
+
+- `datas`가 비어있을 경우 내부 스크롤/줌 상태가 초기화됩니다.
+- 보조 지표가 많을수록 전체 높이(`mBaseHeight`) 대비 보조 영역이 늘어납니다.
+
+### DepthChart
+
+| 이름 | 타입 | 설명 |
+|---|---|---|
+| bids | `List<DepthEntity>` | 매수 뎁스 데이터(가격, 누적/구간 수량) |
+| asks | `List<DepthEntity>` | 매도 뎁스 데이터(가격, 누적/구간 수량) |
+| chartColors | `ChartColors` | 뎁스 라인/영역/텍스트/선택 박스 등 색상 |
+| baseUnit | `int` | 수량 소수 자릿수 |
+| quoteUnit | `int` | 가격 소수 자릿수 |
+| offset | `Offset` | 롱프레스 팝업 위치 보정(오프셋) |
+| chartTranslations | `DepthChartTranslations` | 팝업 라벨 번역(Price/Amount) |
