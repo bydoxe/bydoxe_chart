@@ -115,6 +115,8 @@ class _KChartDemoState extends State<KChartDemo> {
           materialInfoDialog: true,
           // 표기 정렬(좌/우)
           verticalTextAlignment: VerticalTextAlignment.left,
+          // 현재가 라벨을 수직축 정렬과 동일하게(TradingView 스타일)
+          nowPriceLabelAlignment: NowPriceLabelAlignment.followVertical,
           // 앞쪽 여백(차트 좌측 패딩)
           xFrontPadding: 100,
         ),
@@ -208,6 +210,7 @@ class DepthChartDemo extends StatelessWidget {
 | materialInfoDialog | `bool` | 정보창에 Material 래핑 적용 여부 |
 | chartTranslations | `ChartTranslations` | 정보창 라벨 텍스트 번역 값 |
 | timeFormat | `List<String>` | x축/정보창 시간 포맷. `TimeFormat.YEAR_MONTH_DAY` 등 |
+| nowPriceLabelAlignment | `NowPriceLabelAlignment` | 현재가 라벨 정렬: `followVertical`(수직축 정렬과 동일), `left`, `right` |
 | onLoadMore | `Function(bool)?` | 좌/우 끝 도달 시 콜백. `true`=좌측, `false`=우측 끝 |
 | fixedLength | `int` | 가격/수치 소수 자릿수(기본 자동 유추, 수동 지정 가능) |
 | maDayList | `List<int>` | MA 계산 기간 목록(예: `[5,10,20]`) |

@@ -106,8 +106,10 @@ class _MyHomePageState extends State<MyHomePage> {
                 secondaryStateLi: _secondaryStateLi.toSet(),
                 fixedLength: 2,
                 timeFormat: TimeFormat.YEAR_MONTH_DAY,
-                verticalTextAlignment: VerticalTextAlignment.right,
+                verticalTextAlignment: VerticalTextAlignment.right, // 가격 라벨 정렬
                 showNowPrice: true,
+                nowPriceLabelAlignment:
+                    NowPriceLabelAlignment.right, // 현재가 라벨 정렬
               ),
               if (showLoading)
                 Container(

@@ -48,6 +48,7 @@ class ChartPainter extends BaseChartPainter {
   final bool hideGrid;
   final bool showNowPrice;
   final VerticalTextAlignment verticalTextAlignment;
+  final NowPriceLabelAlignment nowPriceLabelAlignment;
   final BaseDimension baseDimension;
 
   ChartPainter(
@@ -67,6 +68,7 @@ class ChartPainter extends BaseChartPainter {
     isOnTap,
     isTapShowInfoDialog,
     required this.verticalTextAlignment,
+    required this.nowPriceLabelAlignment,
     mainStateLi,
     volHidden,
     secondaryStateLi,
@@ -420,12 +422,22 @@ class ChartPainter extends BaseChartPainter {
     );
 
     double offsetX;
-    switch (verticalTextAlignment) {
-      case VerticalTextAlignment.left:
-        offsetX = mWidth - tp.width;
+    switch (nowPriceLabelAlignment) {
+      case NowPriceLabelAlignment.followVertical:
+        switch (verticalTextAlignment) {
+          case VerticalTextAlignment.left:
+            offsetX = mWidth - tp.width;
+            break;
+          case VerticalTextAlignment.right:
+            offsetX = 0;
+            break;
+        }
         break;
-      case VerticalTextAlignment.right:
+      case NowPriceLabelAlignment.left:
         offsetX = 0;
+        break;
+      case NowPriceLabelAlignment.right:
+        offsetX = mWidth - tp.width;
         break;
     }
 

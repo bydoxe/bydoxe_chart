@@ -4,6 +4,8 @@ import 'package:bydoxe_chart/chart_translations.dart';
 import 'package:bydoxe_chart/components/popup_info_view.dart';
 import 'package:bydoxe_chart/k_chart_plus.dart';
 import 'renderer/base_dimension.dart';
+import 'renderer/main_renderer.dart'
+    show NowPriceLabelAlignment, VerticalTextAlignment;
 
 enum MainState { MA, BOLL, SAR }
 
@@ -55,6 +57,7 @@ class KChartWidget extends StatefulWidget {
   final ChartColors chartColors;
   final ChartStyle chartStyle;
   final VerticalTextAlignment verticalTextAlignment;
+  final NowPriceLabelAlignment nowPriceLabelAlignment;
   final bool isTrendLine;
   final double xFrontPadding;
 
@@ -84,6 +87,7 @@ class KChartWidget extends StatefulWidget {
     this.flingCurve = Curves.decelerate,
     this.isOnDrag,
     this.verticalTextAlignment = VerticalTextAlignment.left,
+    this.nowPriceLabelAlignment = NowPriceLabelAlignment.followVertical,
     this.mBaseHeight = 360,
   });
 
@@ -170,6 +174,7 @@ class _KChartWidgetState extends State<KChartWidget>
       fixedLength: widget.fixedLength,
       maDayList: widget.maDayList,
       verticalTextAlignment: widget.verticalTextAlignment,
+      nowPriceLabelAlignment: widget.nowPriceLabelAlignment,
     );
 
     return LayoutBuilder(

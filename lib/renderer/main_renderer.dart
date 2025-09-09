@@ -5,6 +5,8 @@ import 'base_chart_renderer.dart';
 
 enum VerticalTextAlignment { left, right }
 
+enum NowPriceLabelAlignment { followVertical, left, right }
+
 //For TrendLine
 double? trendLineMax;
 double? trendLineScale;
