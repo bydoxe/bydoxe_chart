@@ -300,6 +300,11 @@ KChartWidget(
 - 속성: `markers: List<PositionMarkerEntity>`
 - 항목: `id:int`, `time:int(ms)`, `type: MarkerType.buy|sell`, `color`(선택)
 - 표기: `buy`는 해당 봉 아래에 B, `sell`은 해당 봉 위에 S가 배치됩니다.
+- 스타일: 마커는 말풍선 버블로 표기됩니다(꼬리 방향은 캔들을 가리킴)
+  - 버블 배경색: 마커 색(`color` 없으면 `upColor/dnColor` 자동 적용)
+  - 텍스트 색: 흰색
+  - 꼬리(tail): 삼각형으로 봉의 고가/저가 방향을 가리켜 체결 지점을 명확히 표시
+- 겹침 처리: 동일 봉 시간 구간[t(i), t(i+1))에 여러 마커가 있으면 “최신(마지막)” 1개만 렌더링됩니다.
 
 ```dart
 final markers = <PositionMarkerEntity>[
