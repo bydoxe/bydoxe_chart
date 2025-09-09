@@ -222,8 +222,8 @@ class ChartPainter extends BaseChartPainter {
         element.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
       });
 
-      // render markers for this candle time
-      _drawMarkersForTime(canvas, curX, curPoint.time ?? 0, curPoint);
+      // render marker for this candle bucket (latest only)
+      _drawMarkerForCandle(canvas, curX, i, curPoint);
     }
 
     if ((isLongPress == true || (isTapShowInfoDialog && isOnTap)) &&
@@ -234,45 +234,69 @@ class ChartPainter extends BaseChartPainter {
     canvas.restore();
   }
 
-  void _drawMarkersForTime(Canvas canvas, double x, int time, KLineEntity k) {
+  void _drawMarkerForCandle(Canvas canvas, double x, int i, KLineEntity k) {
     if (markers.isEmpty) return;
+    final int t0 = k.time ?? 0;
+    final int t1 =
+        (i + 1 < datas!.length) ? (datas![i + 1].time ?? (t0 + 1)) : (1 << 62);
+    // 최신 것만: t0 <= time < t1 범위에서 마지막 항목
+    PositionMarkerEntity? chosen;
     for (final m in markers) {
-      if (m.time != time) continue;
-      final Color color = m.color ??
-          ((m.type == MarkerType.buy)
-              ? chartColors.upColor
-              : chartColors.dnColor);
-      final String label = (m.type == MarkerType.buy) ? 'B' : 'S';
-      final TextPainter tp = getChipTextPainter(label, color);
-      const double padH = 4.0;
-      const double padV = 2.0;
-      final double w = tp.width + 2 * padH;
-      final double h = tp.height + 2 * padV;
-      final double centerX = x - w / 2;
-      double top;
-      if (m.type == MarkerType.buy) {
-        // below candle low
-        final double lowY = getMainY(k.low);
-        top = lowY + 4;
-      } else {
-        // above candle high
-        final double highY = getMainY(k.high);
-        top = highY - h - 4;
+      if (m.time >= t0 && m.time < t1) {
+        chosen = m; // overwrite to keep latest
       }
-      final RRect r = RRect.fromRectAndRadius(
-          Rect.fromLTWH(centerX, top, w, h), Radius.circular(3));
-      final Paint bg = Paint()
-        ..color = chartColors.bgColor
-        ..isAntiAlias = true;
-      final Paint bd = Paint()
-        ..style = PaintingStyle.stroke
-        ..color = color
-        ..strokeWidth = 1
-        ..isAntiAlias = true;
-      canvas.drawRRect(r, bg);
-      canvas.drawRRect(r, bd);
-      tp.paint(canvas, Offset(centerX + padH, top + padV));
     }
+    if (chosen == null) return;
+    final Color color = chosen.color ??
+        ((chosen.type == MarkerType.buy)
+            ? chartColors.upColor
+            : chartColors.dnColor);
+    final String label = (chosen.type == MarkerType.buy) ? 'B' : 'S';
+    // bubble with tail pointing to candle
+    final TextPainter tp = getTextPainter(label, Colors.white);
+    const double padH = 4.0;
+    const double padV = 2.0;
+    const double radius = 3.0;
+    const double tailH = 6.0;
+    final double bubbleW = tp.width + 2 * padH;
+    final double bubbleH = tp.height + 2 * padV;
+    final double bx = x - bubbleW / 2;
+    double by;
+    if (chosen.type == MarkerType.buy) {
+      final double lowY = getMainY(k.low);
+      by = lowY + 2 + tailH;
+      final Path tail = Path()
+        ..moveTo(x, lowY + 2)
+        ..lineTo(x - 4, by - 2)
+        ..lineTo(x + 4, by - 2)
+        ..close();
+      canvas.drawPath(
+          tail,
+          Paint()
+            ..color = color
+            ..isAntiAlias = true);
+    } else {
+      final double highY = getMainY(k.high);
+      by = highY - bubbleH - 2 - tailH;
+      final Path tail = Path()
+        ..moveTo(x, highY - 2)
+        ..lineTo(x - 4, by + bubbleH + 2)
+        ..lineTo(x + 4, by + bubbleH + 2)
+        ..close();
+      canvas.drawPath(
+          tail,
+          Paint()
+            ..color = color
+            ..isAntiAlias = true);
+    }
+    final RRect bubble = RRect.fromRectAndRadius(
+        Rect.fromLTWH(bx, by, bubbleW, bubbleH), Radius.circular(radius));
+    canvas.drawRRect(
+        bubble,
+        Paint()
+          ..color = color
+          ..isAntiAlias = true);
+    tp.paint(canvas, Offset(bx + padH, by + padV));
   }
 
   @override

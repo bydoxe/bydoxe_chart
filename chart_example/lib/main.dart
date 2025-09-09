@@ -105,6 +105,25 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
       ),
     ];
 
+    final markers = <PositionMarkerEntity>[
+      if (datas != null && datas!.length > 5)
+        PositionMarkerEntity(
+          id: 101,
+          time:
+              datas![datas!.length - 5].time ??
+              DateTime.now().millisecondsSinceEpoch,
+          type: MarkerType.buy,
+        ),
+      if (datas != null && datas!.length > 10)
+        PositionMarkerEntity(
+          id: 102,
+          time:
+              datas![datas!.length - 10].time ??
+              DateTime.now().millisecondsSinceEpoch,
+          type: MarkerType.sell,
+        ),
+    ];
+
     return Scaffold(
       body: ListView(
         shrinkWrap: true,
@@ -133,6 +152,7 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
                 onPositionAction: (id, action) {
                   debugPrint('### onPositionAction $id $action');
                 },
+                markers: markers,
               ),
               if (showLoading)
                 Container(
