@@ -6,6 +6,7 @@ import 'package:bydoxe_chart/k_chart_plus.dart';
 import 'renderer/base_dimension.dart';
 import 'renderer/main_renderer.dart'
     show NowPriceLabelAlignment, VerticalTextAlignment;
+import 'entity/position_line_entity.dart';
 
 enum MainState { MA, BOLL, SAR }
 
@@ -58,6 +59,7 @@ class KChartWidget extends StatefulWidget {
   final ChartStyle chartStyle;
   final VerticalTextAlignment verticalTextAlignment;
   final NowPriceLabelAlignment nowPriceLabelAlignment;
+  final List<PositionLineEntity> positionLines;
   final bool isTrendLine;
   final double xFrontPadding;
 
@@ -88,6 +90,7 @@ class KChartWidget extends StatefulWidget {
     this.isOnDrag,
     this.verticalTextAlignment = VerticalTextAlignment.left,
     this.nowPriceLabelAlignment = NowPriceLabelAlignment.followVertical,
+    this.positionLines = const <PositionLineEntity>[],
     this.mBaseHeight = 360,
   });
 
@@ -175,6 +178,7 @@ class _KChartWidgetState extends State<KChartWidget>
       maDayList: widget.maDayList,
       verticalTextAlignment: widget.verticalTextAlignment,
       nowPriceLabelAlignment: widget.nowPriceLabelAlignment,
+      positionLines: widget.positionLines,
     );
 
     return LayoutBuilder(

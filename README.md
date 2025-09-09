@@ -237,3 +237,30 @@ class DepthChartDemo extends StatelessWidget {
 | quoteUnit | `int` | 가격 소수 자릿수 |
 | offset | `Offset` | 롱프레스 팝업 위치 보정(오프셋) |
 | chartTranslations | `DepthChartTranslations` | 팝업 라벨 번역(Price/Amount) |
+
+### 포지션 라인(Position Lines)
+
+KChartWidget에서 보유 포지션의 평단가를 수평 라인으로 표시할 수 있습니다.
+
+- 속성: `positionLines: List<PositionLineEntity>`
+- 항목: `price`(필수), `isLong`(선택), `label`(선택), `color`(선택), `lineWidth`(선택)
+- 라벨 정렬: `nowPriceLabelAlignment`와 동일 규칙(`followVertical | left | right`)
+
+예시:
+
+```dart
+final positions = <PositionLineEntity>[
+  PositionLineEntity(price: 103.25, isLong: true, label: 'Entry 103.25'),
+  PositionLineEntity(price: 99.80, isLong: false, label: 'Hedge 99.80', lineWidth: 1.5),
+];
+
+KChartWidget(
+  datas,
+  ChartStyle(),
+  ChartColors(),
+  isTrendLine: false,
+  positionLines: positions,
+  nowPriceLabelAlignment: NowPriceLabelAlignment.followVertical, // 수직축 정렬과 동일하게 표시
+  verticalTextAlignment: VerticalTextAlignment.left,
+)
+```

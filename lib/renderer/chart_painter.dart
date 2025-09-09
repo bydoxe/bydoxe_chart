@@ -5,6 +5,7 @@ import '../entity/info_window_entity.dart';
 import '../entity/k_line_entity.dart';
 import '../utils/date_format_util.dart';
 import 'base_chart_painter.dart';
+import '../entity/position_line_entity.dart';
 import 'base_chart_renderer.dart';
 import 'base_dimension.dart';
 import 'main_renderer.dart';
@@ -50,6 +51,7 @@ class ChartPainter extends BaseChartPainter {
   final VerticalTextAlignment verticalTextAlignment;
   final NowPriceLabelAlignment nowPriceLabelAlignment;
   final BaseDimension baseDimension;
+  final List<PositionLineEntity> positionLines;
 
   ChartPainter(
     this.chartStyle,
@@ -69,6 +71,7 @@ class ChartPainter extends BaseChartPainter {
     isTapShowInfoDialog,
     required this.verticalTextAlignment,
     required this.nowPriceLabelAlignment,
+    required this.positionLines,
     mainStateLi,
     volHidden,
     secondaryStateLi,
@@ -204,6 +207,8 @@ class ChartPainter extends BaseChartPainter {
       drawCrossLine(canvas, size);
     }
     if (isTrendLine == true) drawTrendLines(canvas, size);
+    // draw position lines overlay (after main/vol/secondary charts)
+    drawPositionLines(canvas, size);
     canvas.restore();
   }
 
@@ -446,6 +451,71 @@ class ChartPainter extends BaseChartPainter {
         Rect.fromLTRB(offsetX, top, offsetX + tp.width, top + tp.height),
         nowPricePaint);
     tp.paint(canvas, Offset(offsetX, top));
+  }
+
+  void drawPositionLines(Canvas canvas, Size size) {
+    if (positionLines.isEmpty) return;
+    for (final p in positionLines) {
+      final double y = getMainY(p.price);
+      // clamp within main rect
+      final double clampedY =
+          y.clamp(mTopPadding, size.height - mBottomPadding).toDouble();
+
+      final Color lineColor = p.color ??
+          ((p.isLong == null)
+              ? chartColors.avgColor
+              : (p.isLong! ? chartColors.upColor : chartColors.dnColor));
+
+      // dashed line similar to now price line
+      final double space =
+          chartStyle.nowPriceLineSpan + chartStyle.nowPriceLineLength;
+      double startX = 0;
+      final Paint linePaint = Paint()
+        ..color = lineColor
+        ..strokeWidth = p.lineWidth
+        ..isAntiAlias = true;
+      while (startX < -mTranslateX + mWidth / scaleX) {
+        canvas.drawLine(
+            Offset(startX, clampedY),
+            Offset(startX + chartStyle.nowPriceLineLength, clampedY),
+            linePaint);
+        startX += space;
+      }
+
+      // label text
+      final String labelText = p.label ?? p.price.toStringAsFixed(fixedLength);
+      final TextPainter tp =
+          getTextPainter(labelText, chartColors.nowPriceTextColor);
+
+      double offsetX;
+      switch (nowPriceLabelAlignment) {
+        case NowPriceLabelAlignment.followVertical:
+          switch (verticalTextAlignment) {
+            case VerticalTextAlignment.left:
+              offsetX = mWidth - tp.width;
+              break;
+            case VerticalTextAlignment.right:
+              offsetX = 0;
+              break;
+          }
+          break;
+        case NowPriceLabelAlignment.left:
+          offsetX = 0;
+          break;
+        case NowPriceLabelAlignment.right:
+          offsetX = mWidth - tp.width;
+          break;
+      }
+
+      final Paint bgPaint = Paint()
+        ..color = lineColor
+        ..isAntiAlias = true;
+      final double top = clampedY - tp.height / 2;
+      canvas.drawRect(
+          Rect.fromLTRB(offsetX, top, offsetX + tp.width, top + tp.height),
+          bgPaint);
+      tp.paint(canvas, Offset(offsetX, top));
+    }
   }
 
   //For TrendLine

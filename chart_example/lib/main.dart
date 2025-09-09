@@ -110,6 +110,8 @@ class _MyHomePageState extends State<MyHomePage> {
                 showNowPrice: true,
                 nowPriceLabelAlignment:
                     NowPriceLabelAlignment.right, // 현재가 라벨 정렬
+                materialInfoDialog: true,
+                isLine: false,
               ),
               if (showLoading)
                 Container(
