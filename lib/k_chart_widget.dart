@@ -185,6 +185,7 @@ class _KChartWidgetState extends State<KChartWidget>
       nowPriceLabelAlignment: widget.nowPriceLabelAlignment,
       positionLines: widget.positionLines,
       positionLabelAlignment: widget.positionLabelAlignment,
+      activePositionId: activePositionId,
     );
 
     return LayoutBuilder(
@@ -201,8 +202,31 @@ class _KChartWidgetState extends State<KChartWidget>
                 _painter.isInMainRect(details.localPosition)) {
               isOnTap = true;
               // hit test position chips/buttons first
-              final hit = _hitTestPosition(details.localPosition, _painter);
-              if (hit != null) {
+              final hit =
+                  _hitTestPosition(details.localPosition, _painter) ?? false;
+              // if not hit on position elements, check now price chip when pinned
+              if (!hit && _painter.nowPricePinned == true) {
+                final Rect? chipRect = _painter.nowPriceChipRect;
+                if (chipRect != null &&
+                    chipRect.contains(details.localPosition)) {
+                  // jump to latest: scroll to rightmost
+                  setState(() {
+                    // Jump to latest candle (rightmost): scrollX = 0
+                    mScrollX = 0;
+                  });
+                  notifyChanged();
+                  return;
+                }
+              }
+              if (hit == true) {
+                return;
+              }
+              // if any active position exists and tap didn't hit chips/buttons, close it
+              if (activePositionId != null) {
+                setState(() {
+                  activePositionId = null;
+                  _painter.activePositionId = null;
+                });
                 return;
               }
               if (mSelectX != details.localPosition.dx &&
@@ -210,6 +234,15 @@ class _KChartWidgetState extends State<KChartWidget>
                 mSelectX = details.localPosition.dx;
                 notifyChanged();
               }
+            }
+            // tap outside main rect closes active position as well
+            if (activePositionId != null &&
+                !_painter.isInMainRect(details.localPosition)) {
+              setState(() {
+                activePositionId = null;
+                _painter.activePositionId = null;
+              });
+              return;
             }
             if (widget.isTrendLine && !isLongPress && enableCordRecord) {
               enableCordRecord = false;

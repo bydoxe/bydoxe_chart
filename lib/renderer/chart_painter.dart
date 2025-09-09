@@ -58,6 +58,11 @@ class ChartPainter extends BaseChartPainter {
   Map<int, Rect> _hitBtnClose = {};
   Map<int, Rect> _hitBtnTp = {};
   Map<int, Rect> _hitBtnSl = {};
+  Rect? _nowPriceChipRect;
+  bool _nowPricePinned = false;
+
+  Rect? get nowPriceChipRect => _nowPriceChipRect;
+  bool get nowPricePinned => _nowPricePinned;
 
   // getters to expose hit-test rects
   Map<int, Rect> get hitLeftChip => _hitLeftChip;
@@ -85,6 +90,7 @@ class ChartPainter extends BaseChartPainter {
     required this.nowPriceLabelAlignment,
     required this.positionLines,
     required this.positionLabelAlignment,
+    this.activePositionId,
     mainStateLi,
     volHidden,
     secondaryStateLi,
@@ -452,6 +458,18 @@ class ChartPainter extends BaseChartPainter {
         break;
     }
 
+    // draw dashed guide from last candle price x to chip edge only (default)
+    // but if lastX is off-screen to the left, pin label at 70% width and draw both sides
+    final int lastIndex = datas!.length - 1;
+    final double lastX = translateXtoX(getX(lastIndex));
+
+    bool offLeft = lastX < 0 || lastX > mWidth;
+    if (offLeft) {
+      // place label centered at 70% of width
+      final double targetCenter = mWidth * 0.70;
+      labelLeft = (targetCenter - chipWidth / 2).clamp(0.0, mWidth - chipWidth);
+    }
+
     final double top = y - chipHeight / 2;
     final RRect rrect = RRect.fromRectAndRadius(
       Rect.fromLTWH(labelLeft, top, chipWidth, chipHeight),
@@ -472,33 +490,74 @@ class ChartPainter extends BaseChartPainter {
     canvas.drawRRect(rrect, borderPaint);
     tp.paint(canvas, Offset(labelLeft + padH, top + padV));
 
-    // draw dashed guide from last candle price x to chip edge only
-    final int lastIndex = datas!.length - 1;
-    final double lastX = translateXtoX(getX(lastIndex));
-
-    double endX;
-    if (labelLeft == 0) {
-      endX = labelLeft + chipWidth; // to right edge when left-aligned
+    // draw arrow icon when pinned (offLeft)
+    _nowPricePinned = offLeft;
+    if (offLeft) {
+      final double arrowW = 8;
+      final double arrowH = chipHeight * 0.5;
+      final double ax = labelLeft + chipWidth + 4;
+      final double ay = y - arrowH / 2;
+      final Path pth = Path()
+        ..moveTo(ax, ay)
+        ..lineTo(ax, ay + arrowH)
+        ..lineTo(ax + arrowW, ay + arrowH / 2)
+        ..close();
+      final Paint arrowPaint = Paint()
+        ..style = PaintingStyle.fill
+        ..color = nowColor
+        ..isAntiAlias = true;
+      canvas.drawPath(pth, arrowPaint);
+      // expand hit rect to include arrow
+      _nowPriceChipRect =
+          Rect.fromLTWH(labelLeft, top, chipWidth + 4 + arrowW, chipHeight);
     } else {
-      endX = labelLeft; // to left edge when right-aligned
+      _nowPriceChipRect = Rect.fromLTWH(labelLeft, top, chipWidth, chipHeight);
     }
 
-    final double fromX = lastX.clamp(0, mWidth);
-    final double toX = endX.clamp(0, mWidth);
-
+    // dashed parameters (denser)
     final Paint linePaint = Paint()
       ..color = nowColor
       ..strokeWidth = this.chartStyle.nowPriceLineWidth
       ..isAntiAlias = true;
+    final double seg = this.chartStyle.nowPriceLineLength * 0.5;
+    final double gap = this.chartStyle.nowPriceLineSpan * 0.5;
 
-    double start = fromX < toX ? fromX : toX;
-    final double stop = fromX < toX ? toX : fromX;
-    final double seg = this.chartStyle.nowPriceLineLength;
-    final double gap = this.chartStyle.nowPriceLineSpan;
-    while (start < stop) {
-      final double next = (start + seg).clamp(start, stop);
-      canvas.drawLine(Offset(start, y), Offset(next, y), linePaint);
-      start = next + gap;
+    if (offLeft) {
+      // draw left side from 0 -> labelLeft
+      double start = 0;
+      final double stop = labelLeft;
+      while (start < stop) {
+        final double next = (start + seg).clamp(start, stop);
+        canvas.drawLine(Offset(start, y), Offset(next, y), linePaint);
+        start = next + gap;
+      }
+      // draw right side from labelRight -> mWidth
+      double startR = labelLeft + chipWidth;
+      final double stopR = mWidth;
+      while (startR < stopR) {
+        final double next = (startR + seg).clamp(startR, stopR);
+        canvas.drawLine(Offset(startR, y), Offset(next, y), linePaint);
+        startR = next + gap;
+      }
+    } else {
+      // default: from lastX to chip edge
+      double endX;
+      if (labelLeft == 0) {
+        endX = labelLeft + chipWidth; // to right edge when left-aligned
+      } else {
+        endX = labelLeft; // to left edge when right-aligned
+      }
+
+      final double fromX = lastX.clamp(0, mWidth);
+      final double toX = endX.clamp(0, mWidth);
+
+      double start = fromX < toX ? fromX : toX;
+      final double stop = fromX < toX ? toX : fromX;
+      while (start < stop) {
+        final double next = (start + seg).clamp(start, stop);
+        canvas.drawLine(Offset(start, y), Offset(next, y), linePaint);
+        start = next + gap;
+      }
     }
   }
 
@@ -520,8 +579,9 @@ class ChartPainter extends BaseChartPainter {
               : (p.isLong! ? chartColors.upColor : chartColors.dnColor));
 
       // 1) dashed horizontal guide across the screen
-      final double space =
-          chartStyle.nowPriceLineSpan + chartStyle.nowPriceLineLength;
+      final double seg = chartStyle.nowPriceLineLength * 0.5;
+      final double gap = chartStyle.nowPriceLineSpan * 0.5;
+      final double space = seg + gap;
       double startX = 0;
       final Paint linePaint = Paint()
         ..color = posColor
@@ -533,10 +593,8 @@ class ChartPainter extends BaseChartPainter {
             linePaint..strokeWidth = p.lineWidth);
       } else {
         while (startX < size.width) {
-          canvas.drawLine(
-              Offset(startX, clampedY),
-              Offset(startX + chartStyle.nowPriceLineLength, clampedY),
-              linePaint);
+          canvas.drawLine(Offset(startX, clampedY),
+              Offset(startX + seg, clampedY), linePaint);
           startX += space;
         }
       }

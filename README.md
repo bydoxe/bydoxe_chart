@@ -212,6 +212,8 @@ class DepthChartDemo extends StatelessWidget {
 | timeFormat | `List<String>` | x축/정보창 시간 포맷. `TimeFormat.YEAR_MONTH_DAY` 등 |
 | nowPriceLabelAlignment | `NowPriceLabelAlignment` | 현재가 라벨 정렬: `followVertical`(수직축 정렬과 동일), `left`, `right` |
 | positionLabelAlignment | `PositionLabelAlignment` | 포지션 좌/우 라벨 정렬 기준(우측 가격칩은 우측 정렬, 좌측 포지션칩은 좌측 정렬을 기본으로 하되 이 옵션으로 동기화할 수 있음) |
+| positionLines | `List<PositionLineEntity>` | 포지션 라인/칩 구성 리스트 |
+| onPositionAction | `void Function(int id, PositionAction action)?` | 포지션 액션 콜백(닫기/TP/SL). 인자는 `PositionLineEntity.id`, `PositionAction` |
 | onLoadMore | `Function(bool)?` | 좌/우 끝 도달 시 콜백. `true`=좌측, `false`=우측 끝 |
 | fixedLength | `int` | 가격/수치 소수 자릿수(기본 자동 유추, 수동 지정 가능) |
 | maDayList | `List<int>` | MA 계산 기간 목록(예: `[5,10,20]`) |
@@ -244,16 +246,15 @@ class DepthChartDemo extends StatelessWidget {
 KChartWidget에서 보유 포지션의 평단가를 수평 라인으로 표시할 수 있습니다.
 
 - 속성: `positionLines: List<PositionLineEntity>`
-- 항목: `price`(필수), `isLong`(선택), `label`(선택), `color`(선택), `lineWidth`(선택)
-- `id`(필수): 라인/액션 콜백 식별자
+- 항목: `id:int`(필수), `price`(필수), `isLong`(선택), `label`(선택), `color`(선택), `lineWidth`(선택)
 - 라벨 정렬: 가격 라벨은 `nowPriceLabelAlignment`, 포지션 좌측 칩은 `positionLabelAlignment` 규칙(`followVertical | left | right`)
 
 스타일(기본 구현)
 
-- 현재가 라벨: 둥근 사각형 칩(라운드 4), 텍스트/테두리 단일 색, 배경 `selectFillColor`, 점선은 마지막 봉의 x부터 라벨 가장자리까지만 표시
+- 현재가 라벨: 둥근 사각형 칩(라운드 4), 텍스트/테두리 단일 색, 배경 `selectFillColor`, 점선은 기본적으로 마지막 봉의 x부터 라벨 가장자리까지만 표시
   - 색상 설정: 텍스트/테두리/점선 컬러는 `ChartColors.nowPriceUpColor`(상승/하락 무관 동일 적용), 배경은 `ChartColors.selectFillColor`
 - 포지션 라인: 화면 가로 점선(`position.color`),
-  - 우측 가격 칩: 배경 `bgColor`, 테두리/텍스트 `position.color`, 현재가 라벨과 동일한 칩 크기 규칙(padH=6, padV=3, radius=4)
+  - 우측 가격 칩: 배경 `bgColor`, 테두리/텍스트 `position.color`, 현재가 라벨과 동일한 칩 크기 규칙(padH=5, padV=2, radius=4)
   - 좌측 포지션 칩(2파트): 외곽선 `position.color`, 왼쪽 파트 배경 `position.color`(텍스트 흰색, "Long xx.xx%" 또는 "Short xx.xx%"), 오른쪽 파트 배경 `bgColor`(텍스트 `position.color`, 내용은 `label`)
 
 인터랙션(확장/액션 버튼)
@@ -262,6 +263,13 @@ KChartWidget에서 보유 포지션의 평단가를 수평 라인으로 표시�
   - 닫기(×), TP, SL 버튼
   - 버튼 높이=칩 높이, 배경=`bgColor`, 테두리/텍스트=`position.color`
 - 각 버튼을 탭하면 `(id, action)` 형태로 콜백이 전달됩니다.
+- 활성 상태에서 칩/버튼 외 영역을 탭하면 비활성(닫힘)
+
+현재가 라벨의 고정 모드(좌측 스크롤 시)
+
+- 마지막 분봉이 화면 밖으로 나가면 현재가 라벨은 화면 우측에서 30% 지점(= 좌측 기준 70%)에 고정 표기됩니다
+- 이때 라벨 오른쪽에 화살표가 표시되며, 라벨/화살표를 탭하면 차트를 최신 분봉이 보이도록 우측 끝으로 이동합니다
+- 점선은 라벨 기준으로 좌/우 양방향으로 화면 끝까지 이어져 표시됩니다(촘촘한 패턴)
 
 ```dart
 KChartWidget(
@@ -271,7 +279,7 @@ KChartWidget(
   isTrendLine: false,
   positionLines: [
     PositionLineEntity(
-      id: 'pos-1',
+      id: 1,
       price: 103.25,
       isLong: true,
       label: 'BTCUSDT',
@@ -289,8 +297,8 @@ KChartWidget(
 
 ```dart
 final positions = <PositionLineEntity>[
-  PositionLineEntity(price: 103.25, isLong: true, label: 'Entry 103.25'),
-  PositionLineEntity(price: 99.80, isLong: false, label: 'Hedge 99.80', lineWidth: 1.5),
+  PositionLineEntity(id: 1, price: 103.25, isLong: true, label: 'Entry 103.25'),
+  PositionLineEntity(id: 2, price: 99.80, isLong: false, label: 'Hedge 99.80', lineWidth: 1.5),
 ];
 
 KChartWidget(

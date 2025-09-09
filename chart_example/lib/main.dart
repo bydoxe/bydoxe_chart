@@ -130,6 +130,9 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
                 materialInfoDialog: true,
                 isLine: false,
                 positionLines: positions,
+                onPositionAction: (id, action) {
+                  debugPrint('### onPositionAction $id $action');
+                },
               ),
               if (showLoading)
                 Container(
