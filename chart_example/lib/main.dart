@@ -1,8 +1,12 @@
 import 'dart:convert';
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:bydoxe_chart/k_chart_plus.dart';
+
+import 'services/rest_api_service.dart';
+import 'services/websocket_service.dart';
 
 void main() => runApp(const DemoApp());
 
@@ -32,7 +36,11 @@ class ChartExamplePage extends StatefulWidget {
 }
 
 class _ChartExamplePageState extends State<ChartExamplePage> {
+  final ws = WebSocketService();
+  StreamSubscription<Map<String, dynamic>>? _wsSub;
+
   List<KLineEntity>? datas;
+  KLineEntity? _lastCandle;
   bool showLoading = true;
   bool _volHidden = false;
   // final Set<SecondaryState> _secondaryStateLi = <SecondaryState>{};
@@ -46,7 +54,7 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
   @override
   void initState() {
     super.initState();
-    getData('1day');
+    loadKlineData();
     rootBundle.loadString('assets/depth.json').then((result) {
       final parseJson = json.decode(result);
       final tick = parseJson['tick'] as Map<String, dynamic>;
@@ -61,6 +69,51 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
           )
           .toList();
       initDepth(bids, asks);
+    });
+  }
+
+  Future<void> loadKlineData() async {
+    final response = await RestApiService.getKLineData(null);
+    convertKlineData(response);
+
+    // 연속 수신: aggTrade 이벤트를 지속적으로 로그
+    _wsSub = ws.listenAggTrade(symbol: 'BTCUSDT').listen((value) {
+      final c = _lastCandle;
+      if (c == null || datas == null || datas!.isEmpty) return;
+
+      final double last =
+          double.tryParse(value['data']['p'] as String) ?? c.close;
+      final double quantity =
+          double.tryParse(value['data']['q'] as String) ?? 0.0;
+      final double tradeVol = quantity * last;
+      final int time = value['data']['T'] as int; // ms
+      final int nextTime = (c.time ?? 0) + 60000; // c.time + 1분
+
+      if (time < nextTime) {
+        // 현재 분 내: 마지막 캔들 갱신
+        c.high = math.max(c.high, last);
+        c.low = math.min(c.low, last);
+        c.close = last;
+        c.vol = c.vol + tradeVol;
+        datas![datas!.length - 1] = c;
+        _lastCandle = c;
+      } else {
+        // 다음 분 이상: 새 캔들 추가 (nextTime 기준)
+        final KLineEntity nc = KLineEntity.fromCustom(
+          open: last,
+          close: last,
+          high: last,
+          low: last,
+          time: nextTime,
+          vol: tradeVol,
+        );
+        datas!.add(nc);
+        _lastCandle = nc;
+      }
+
+      // 지표 재계산 및 리빌드
+      DataUtil.calculate(datas!);
+      setState(() {});
     });
   }
 
@@ -91,38 +144,38 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
     final positions = <PositionLineEntity>[
       PositionLineEntity(
         id: 1, // 포지션 고유 ID
-        price: 110178.88, // 포지션 진입가격
+        price: 112321.3, // 포지션 진입가격
         label: "0.001", // 포지션 수량
         color: Colors.red,
         isLong: false,
       ),
       PositionLineEntity(
         id: 2,
-        price: 116136.27,
+        price: 1112614,
         label: "0.02",
         color: Colors.green,
         isLong: true,
       ),
     ];
 
-    final markers = <PositionMarkerEntity>[
-      if (datas != null && datas!.length > 5)
-        PositionMarkerEntity(
-          id: 101,
-          time:
-              datas![datas!.length - 5].time ??
-              DateTime.now().millisecondsSinceEpoch,
-          type: MarkerType.buy,
-        ),
-      if (datas != null && datas!.length > 10)
-        PositionMarkerEntity(
-          id: 102,
-          time:
-              datas![datas!.length - 10].time ??
-              DateTime.now().millisecondsSinceEpoch,
-          type: MarkerType.sell,
-        ),
-    ];
+    // final markers = <PositionMarkerEntity>[
+    //   if (datas != null && datas!.length > 5)
+    //     PositionMarkerEntity(
+    //       id: 101,
+    //       time:
+    //           datas![datas!.length - 5].time ??
+    //           DateTime.now().millisecondsSinceEpoch,
+    //       type: MarkerType.buy,
+    //     ),
+    //   if (datas != null && datas!.length > 10)
+    //     PositionMarkerEntity(
+    //       id: 102,
+    //       time:
+    //           datas![datas!.length - 10].time ??
+    //           DateTime.now().millisecondsSinceEpoch,
+    //       type: MarkerType.sell,
+    //     ),
+    // ];
 
     return Scaffold(
       body: ListView(
@@ -148,11 +201,11 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
                     NowPriceLabelAlignment.right, // 현재가 라벨 정렬
                 materialInfoDialog: true,
                 isLine: false,
-                positionLines: positions,
+                positionLines: [],
                 onPositionAction: (id, action) {
                   debugPrint('### onPositionAction $id $action');
                 },
-                markers: markers,
+                // markers: markers,
               ),
               if (showLoading)
                 Container(
@@ -302,48 +355,34 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
     );
   }
 
-  void getData(String period) {
-    final Future<String> future = getChatDataFromInternet(period);
-    //final Future<String> future = getChatDataFromJson();
-    future
-        .then((String result) {
-          solveChatData(result);
-        })
-        .catchError((error) {
-          showLoading = false;
-          setState(() {});
-          debugPrint('### datas error $error');
-        });
-  }
-
-  Future<String> getChatDataFromInternet(String? period) async {
-    var url =
-        'https://api.huobi.br.com/market/history/kline?period=${period ?? '1day'}&size=300&symbol=btcusdt';
-    late String result;
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200) {
-      result = response.body;
-    } else {
-      debugPrint('Failed getting IP address');
-    }
-    return result;
-  }
-
-  Future<String> getChatDataFromJson() async {
-    return rootBundle.loadString('assets/chatData.json');
-  }
-
-  void solveChatData(String result) {
-    final Map parseJson = json.decode(result) as Map<dynamic, dynamic>;
-    final list = parseJson['data'] as List<dynamic>;
-    datas = list
-        .map((item) => KLineEntity.fromJson(item as Map<String, dynamic>))
-        .toList()
-        .reversed
+  void convertKlineData(String result) {
+    final dynamic parseJson = json.decode(result);
+    datas = parseJson
+        .map(
+          (item) => KLineEntity.fromCustom(
+            open: double.tryParse(item[1]) as double,
+            close: double.tryParse(item[4]) as double,
+            time: item[0] as int,
+            high: double.tryParse(item[2]) as double,
+            low: double.tryParse(item[3]) as double,
+            vol: double.tryParse(item[7]) as double,
+          ),
+        )
         .toList()
         .cast<KLineEntity>();
+
+    // 마지막 봉 저장
+    _lastCandle = (datas != null && datas!.isNotEmpty) ? datas!.last : null;
+
     DataUtil.calculate(datas!);
     showLoading = false;
     setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _wsSub?.cancel();
+    ws.disconnect();
+    super.dispose();
   }
 }

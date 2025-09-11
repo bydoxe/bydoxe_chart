@@ -10,7 +10,7 @@
 - **표시 요소**: 현재가 점선/라벨, 구간 내 고가/저가 표기, 격자 표시 토글, 좌/우 수직축 정렬, 시간 표시 자동 포맷(주기 추론) 및 커스텀 포맷 지원
 - **스타일/테마**: `ChartColors`로 배경/텍스트/테두리/지표/깊이 등 세부 색상 제어, `ChartStyle`로 폭/패딩/두께/격자/현재가 라인 등 구성. 다크 모드 등 멀티 테마 적용 가능
 - **현지화**: `ChartTranslations`, `DepthChartTranslations`로 정보 창/깊이 차트 라벨 다국어 지원
-- **구성 옵션(주요)**: `isLine`, `volHidden`, `mainStateLi`, `secondaryStateLi`, `isTrendLine`, `xFrontPadding`, `isTapShowInfoDialog`, `showNowPrice`, `showInfoDialog`, `materialInfoDialog`, `timeFormat`, `fixedLength`, `maDayList`, `flingTime/flingRatio/flingCurve`, `verticalTextAlignment`
+- **구성 옵션(주요)**: `isLine`, `volHidden`, `mainStateLi`, `secondaryStateLi`, `isTrendLine`, `xFrontPadding`, `isTapShowInfoDialog`, `showNowPrice`, `showInfoDialog`, `materialInfoDialog`, `timeFormat`, `fixedLength`, `maDayList`, `flingTime/flingRatio/flingCurve`, `verticalTextAlignment`, `nowPriceLabelAlignment`, `positionLabelAlignment`, `positionLines`, `markers`, `onPositionAction`
 - **구성 요소**: `KChartWidget`(메인 차트), `DepthChart`(호가뎁스), `PopupInfoView`(정보 팝업)
 
 ## 데이터/유틸
@@ -38,6 +38,11 @@
 dependencies:
   bydoxe_chart: ^1.0.3
 ```
+
+## 환경 요구사항
+
+- Dart SDK: ">=3.0.5 <4.0.0" (프로젝트 `pubspec.yaml` 기준)
+- Flutter: 최신 안정 채널 권장
 
 ## 사용 예시
 
@@ -209,7 +214,7 @@ class DepthChartDemo extends StatelessWidget {
 | showInfoDialog | `bool` | 정보창 위젯(`PopupInfoView`) 표시 여부 |
 | materialInfoDialog | `bool` | 정보창에 Material 래핑 적용 여부 |
 | chartTranslations | `ChartTranslations` | 정보창 라벨 텍스트 번역 값 |
-| timeFormat | `List<String>` | x축/정보창 시간 포맷. `TimeFormat.YEAR_MONTH_DAY` 등 |
+| timeFormat | `List<String>` | 정보창 시간 포맷. `TimeFormat.YEAR_MONTH_DAY` 등 (x축 포맷은 `ChartStyle.dateTimeFormat` 사용 또는 자동 추론) |
 | nowPriceLabelAlignment | `NowPriceLabelAlignment` | 현재가 라벨 정렬: `followVertical`(수직축 정렬과 동일), `left`, `right` |
 | positionLabelAlignment | `PositionLabelAlignment` | 포지션 좌/우 라벨 정렬 기준(우측 가격칩은 우측 정렬, 좌측 포지션칩은 좌측 정렬을 기본으로 하되 이 옵션으로 동기화할 수 있음) |
 | positionLines | `List<PositionLineEntity>` | 포지션 라인/칩 구성 리스트 |
@@ -223,6 +228,10 @@ class DepthChartDemo extends StatelessWidget {
 | isOnDrag | `Function(bool)?` | 드래그 상태 콜백. `true`=드래그 중, `false`=종료 |
 | verticalTextAlignment | `VerticalTextAlignment` | 수직축 값 라벨 정렬: `left` 또는 `right` |
 | mBaseHeight | `double` | 기준 높이. 내부적으로 볼륨/보조 섹션 높이 산출에 사용 |
+
+노트:
+
+- x축 시간 포맷 커스텀은 `chartStyle.dateTimeFormat`을 설정하세요. 설정하지 않으면 데이터 주기를 자동 추론하여 포맷을 선택합니다. 정보창의 시간은 `timeFormat`을 따릅니다.
 
 참고:
 
@@ -240,6 +249,8 @@ class DepthChartDemo extends StatelessWidget {
 | quoteUnit | `int` | 가격 소수 자릿수 |
 | offset | `Offset` | 롱프레스 팝업 위치 보정(오프셋) |
 | chartTranslations | `DepthChartTranslations` | 팝업 라벨 번역(Price/Amount) |
+
+- 기본값: `baseUnit = 2`, `quoteUnit = 6`, `offset = Offset(10, 10)`
 
 ### 포지션 라인(Position Lines)
 
