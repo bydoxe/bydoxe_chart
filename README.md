@@ -5,7 +5,7 @@
 - **차트 유형**: 캔들(봉), 라인 차트, 거래량(Vol), 보조지표 다중 표기, 호가 뎁스(Depth) 차트
   - **메인 지표**: MA, BOLL, SAR
   - **보조 지표**: MACD, KDJ, RSI, WR, CCI (여러 개 동시 표시 지원)
-- **상호작용**: 드래그 스크롤, 핀치 줌, 플링(가속 스크롤), 롱프레스 십자선/데이터 조회, 탭 기반 정보 팝업, 추세선(TrendLine) 모드로 차트 상 라인 그리기
+- **상호작용**: 드래그 스크롤, 핀치 줌, 플링(가속 스크롤), 롱프레스 십자선/데이터 조회, 탭 기반 정보 팝업, 추세선(TrendLine) 모드로 차트 상 라인 그리기, 우측 가격축 드래그로 수직 확대/축소(중앙 기준)
 - **렌더링/성능**: 가시 구간만 계산/렌더, 이진 탐색 기반 인덱싱, 최대 스크롤 범위 관리, `onLoadMore(bool isLeft)` 콜백으로 양 끝 도달 시 추가 로딩 트리거
 - **표시 요소**: 현재가 점선/라벨, 구간 내 고가/저가 표기, 격자 표시 토글, 좌/우 수직축 정렬, 시간 표시 자동 포맷(주기 추론) 및 커스텀 포맷 지원
 - **스타일/테마**: `ChartColors`로 배경/텍스트/테두리/지표/깊이 등 세부 색상 제어, `ChartStyle`로 폭/패딩/두께/격자/현재가 라인 등 구성. 다크 모드 등 멀티 테마 적용 가능
@@ -220,6 +220,7 @@ class DepthChartDemo extends StatelessWidget {
 | positionLines | `List<PositionLineEntity>` | 포지션 라인/칩 구성 리스트 |
 | onPositionAction | `void Function(int id, PositionAction action)?` | 포지션 액션 콜백(닫기/TP/SL). 인자는 `PositionLineEntity.id`, `PositionAction` |
 | onLoadMore | `Function(bool)?` | 좌/우 끝 도달 시 콜백. `true`=좌측, `false`=우측 끝 |
+| onEdgeLoadTs | `void Function(bool isLeft, int ts)?` | 끝 도달 시 페이징 기준 타임스탬프 제공. `true`(좌측)=현재 마지막 봉 시간+1ms, `false`(우측)=현재 첫 봉 시간-1ms |
 | fixedLength | `int` | 가격/수치 소수 자릿수(기본 자동 유추, 수동 지정 가능) |
 | maDayList | `List<int>` | MA 계산 기간 목록(예: `[5,10,20]`) |
 | flingTime | `int` | 플링 애니메이션 지속(ms) |
@@ -232,6 +233,30 @@ class DepthChartDemo extends StatelessWidget {
 노트:
 
 - x축 시간 포맷 커스텀은 `chartStyle.dateTimeFormat`을 설정하세요. 설정하지 않으면 데이터 주기를 자동 추론하여 포맷을 선택합니다. 정보창의 시간은 `timeFormat`을 따릅니다.
+
+### 스크롤/페이징 동작
+
+- `onLoadMore(bool isLeft)`: 플링으로 양 끝에 도달했을 때 호출됩니다. 좌측 끝 도달 시 `true`, 우측 끝 도달 시 `false`.
+- `onEdgeLoadTs(bool isLeft, int ts)`: 끝 도달 시 함께 제공되는 타임스탬프입니다.
+  - `isLeft=true`(좌측): 현재 로딩된 데이터의 마지막 봉 시간 + 1ms(이후 구간 로드에 사용)
+  - `isLeft=false`(우측): 현재 로딩된 데이터의 첫 봉 시간 - 1ms(이전 구간 로드에 사용)
+
+예)
+
+```dart
+KChartWidget(
+  datas,
+  chartStyle,
+  chartColors,
+  isTrendLine: false,
+  onEdgeLoadTs: (isLeft, ts) {
+    if (!isLeft) {
+      // 우측 끝: ts 이전 구간 추가 로드
+      loadMoreKlineData(ts);
+    }
+  },
+)
+```
 
 참고:
 
