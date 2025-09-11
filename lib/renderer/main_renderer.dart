@@ -30,6 +30,7 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
   double scaleX;
   late Paint mLinePaint;
   final VerticalTextAlignment verticalTextAlignment;
+  final double priceScale;
 
   MainRenderer(
       Rect mainRect,
@@ -43,6 +44,7 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
       this.chartColors,
       this.scaleX,
       this.verticalTextAlignment,
+      this.priceScale,
       [this.maDayList = const [5, 10, 20]])
       : super(
             chartRect: mainRect,
@@ -63,11 +65,29 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
         chartRect.top + _contentPadding,
         chartRect.right,
         chartRect.bottom - _contentPadding);
-    if (maxValue == minValue) {
-      maxValue *= 1.5;
-      minValue /= 2;
+    // keep original window
+    double origMax = maxValue;
+    double origMin = minValue;
+    if (origMax == origMin) {
+      origMax *= 1.5;
+      origMin /= 2;
     }
-    scaleY = _contentRect.height / (maxValue - minValue);
+
+    // symmetric scaling about center of current window
+    final double center = (origMax + origMin) / 2.0;
+    final double range = (origMax - origMin);
+    // Baseline behavior: at load the window exactly fits extremes (range).
+    // Allow only zoom-out beyond baseline; when zooming back, stop at baseline.
+    final double safeScale = priceScale <= 0 ? 1.0 : priceScale;
+    double newRange = range * safeScale; // >1 => zoom-out, <1 => zoom-in
+    if (newRange < range) newRange = range; // clamp minimum to baseline
+    double newMax = center + newRange / 2.0;
+    double newMin = center - newRange / 2.0;
+
+    // apply adjusted window
+    this.maxValue = newMax;
+    this.minValue = newMin;
+    scaleY = _contentRect.height / (this.maxValue - this.minValue);
   }
   @override
   void drawText(Canvas canvas, CandleEntity data, double x) {

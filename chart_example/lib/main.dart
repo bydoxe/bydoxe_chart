@@ -139,6 +139,36 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
     setState(() {});
   }
 
+  Future<void> loadMoreKlineData(int ts) async {
+    final response = await RestApiService.getKLineData(ts);
+    final List<dynamic> parsed = json.decode(response) as List<dynamic>;
+    final List<KLineEntity> more = parsed
+        .map<KLineEntity>(
+          (item) => KLineEntity.fromCustom(
+            open: double.tryParse(item[1].toString()) ?? 0.0,
+            close: double.tryParse(item[4].toString()) ?? 0.0,
+            time: item[0] as int,
+            high: double.tryParse(item[2].toString()) ?? 0.0,
+            low: double.tryParse(item[3].toString()) ?? 0.0,
+            vol: double.tryParse(item[7].toString()) ?? 0.0,
+          ),
+        )
+        .toList();
+
+    if (datas == null || datas!.isEmpty) {
+      datas = more;
+    } else {
+      final int firstTime = datas!.first.time ?? 0;
+      final List<KLineEntity> prepend = more
+          .where((e) => (e.time ?? 0) < firstTime)
+          .toList();
+      datas = [...prepend, ...datas!];
+    }
+
+    DataUtil.calculate(datas!);
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final positions = <PositionLineEntity>[
@@ -158,24 +188,24 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
       ),
     ];
 
-    // final markers = <PositionMarkerEntity>[
-    //   if (datas != null && datas!.length > 5)
-    //     PositionMarkerEntity(
-    //       id: 101,
-    //       time:
-    //           datas![datas!.length - 5].time ??
-    //           DateTime.now().millisecondsSinceEpoch,
-    //       type: MarkerType.buy,
-    //     ),
-    //   if (datas != null && datas!.length > 10)
-    //     PositionMarkerEntity(
-    //       id: 102,
-    //       time:
-    //           datas![datas!.length - 10].time ??
-    //           DateTime.now().millisecondsSinceEpoch,
-    //       type: MarkerType.sell,
-    //     ),
-    // ];
+    final markers = <PositionMarkerEntity>[
+      if (datas != null && datas!.length > 5)
+        PositionMarkerEntity(
+          id: 101,
+          time:
+              datas![datas!.length - 5].time ??
+              DateTime.now().millisecondsSinceEpoch,
+          type: MarkerType.buy,
+        ),
+      if (datas != null && datas!.length > 10)
+        PositionMarkerEntity(
+          id: 102,
+          time:
+              datas![datas!.length - 10].time ??
+              DateTime.now().millisecondsSinceEpoch,
+          type: MarkerType.sell,
+        ),
+    ];
 
     return Scaffold(
       body: ListView(
@@ -201,11 +231,18 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
                     NowPriceLabelAlignment.right, // 현재가 라벨 정렬
                 materialInfoDialog: true,
                 isLine: false,
-                positionLines: [],
+                positionLines: positions,
                 onPositionAction: (id, action) {
                   debugPrint('### onPositionAction $id $action');
                 },
-                // markers: markers,
+                markers: markers,
+                onEdgeLoadTs: (isLeft, ts) {
+                  // 차트가 좌측 도달시, 새로운 캔들 데이터 로드
+                  debugPrint('### onEdgeLoadTs $isLeft $ts');
+                  if (!isLeft) {
+                    loadMoreKlineData(ts);
+                  }
+                },
               ),
               if (showLoading)
                 Container(
@@ -356,20 +393,19 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
   }
 
   void convertKlineData(String result) {
-    final dynamic parseJson = json.decode(result);
-    datas = parseJson
-        .map(
+    final List<dynamic> parsed = json.decode(result) as List<dynamic>;
+    datas = parsed
+        .map<KLineEntity>(
           (item) => KLineEntity.fromCustom(
-            open: double.tryParse(item[1]) as double,
-            close: double.tryParse(item[4]) as double,
+            open: double.tryParse(item[1].toString()) ?? 0.0,
+            close: double.tryParse(item[4].toString()) ?? 0.0,
             time: item[0] as int,
-            high: double.tryParse(item[2]) as double,
-            low: double.tryParse(item[3]) as double,
-            vol: double.tryParse(item[7]) as double,
+            high: double.tryParse(item[2].toString()) ?? 0.0,
+            low: double.tryParse(item[3].toString()) ?? 0.0,
+            vol: double.tryParse(item[7].toString()) ?? 0.0,
           ),
         )
-        .toList()
-        .cast<KLineEntity>();
+        .toList();
 
     // 마지막 봉 저장
     _lastCandle = (datas != null && datas!.isNotEmpty) ? datas!.last : null;

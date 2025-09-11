@@ -48,6 +48,7 @@ class ChartPainter extends BaseChartPainter {
   final ChartStyle chartStyle;
   final bool hideGrid;
   final bool showNowPrice;
+  double priceScale;
   final VerticalTextAlignment verticalTextAlignment;
   final NowPriceLabelAlignment nowPriceLabelAlignment;
   final BaseDimension baseDimension;
@@ -101,6 +102,7 @@ class ChartPainter extends BaseChartPainter {
     this.showNowPrice = true,
     this.fixedLength = 2,
     this.maDayList = const [5, 10, 20],
+    this.priceScale = 1.0,
   }) : super(chartStyle,
             datas: datas,
             scaleX: scaleX,
@@ -148,6 +150,7 @@ class ChartPainter extends BaseChartPainter {
       this.chartColors,
       this.scaleX,
       verticalTextAlignment,
+      priceScale,
       maDayList,
     );
     if (mVolRect != null) {
@@ -252,12 +255,12 @@ class ChartPainter extends BaseChartPainter {
             ? chartColors.upColor
             : chartColors.dnColor);
     final String label = (chosen.type == MarkerType.buy) ? 'B' : 'S';
-    // bubble with tail pointing to candle
-    final TextPainter tp = getTextPainter(label, Colors.white);
-    const double padH = 4.0;
-    const double padV = 2.0;
-    const double radius = 3.0;
-    const double tailH = 6.0;
+    // bubble with tail pointing to candle (smaller)
+    final TextPainter tp = getMarkerTextPainter(label);
+    const double padH = 3.0;
+    const double padV = 1.5;
+    const double radius = 2.0;
+    const double tailH = 4.0;
     final double bubbleW = tp.width + 2 * padH;
     final double bubbleH = tp.height + 2 * padV;
     final double bx = x - bubbleW / 2;
@@ -267,8 +270,8 @@ class ChartPainter extends BaseChartPainter {
       by = lowY + 2 + tailH;
       final Path tail = Path()
         ..moveTo(x, lowY + 2)
-        ..lineTo(x - 4, by - 2)
-        ..lineTo(x + 4, by - 2)
+        ..lineTo(x - 3, by - 2)
+        ..lineTo(x + 3, by - 2)
         ..close();
       canvas.drawPath(
           tail,
@@ -280,8 +283,8 @@ class ChartPainter extends BaseChartPainter {
       by = highY - bubbleH - 2 - tailH;
       final Path tail = Path()
         ..moveTo(x, highY - 2)
-        ..lineTo(x - 4, by + bubbleH + 2)
-        ..lineTo(x + 4, by + bubbleH + 2)
+        ..lineTo(x - 3, by + bubbleH + 2)
+        ..lineTo(x + 3, by + bubbleH + 2)
         ..close();
       canvas.drawPath(
           tail,
@@ -640,8 +643,12 @@ class ChartPainter extends BaseChartPainter {
     for (final p in positionLines) {
       // screen-space Y coordinate for position price
       final double y = getMainY(p.price);
+      // If position price is outside current main chart Y-range, skip rendering (overflow hidden)
+      if (y < mMainRect.top || y > mMainRect.bottom) {
+        continue;
+      }
       final double clampedY =
-          y.clamp(mTopPadding, size.height - mBottomPadding).toDouble();
+          y.clamp(mMainRect.top, mMainRect.bottom).toDouble();
 
       final Color posColor = p.color ??
           ((p.isLong == null)
@@ -678,7 +685,11 @@ class ChartPainter extends BaseChartPainter {
       final String priceText = p.price.toStringAsFixed(fixedLength);
       final TextPainter priceTP = getChipTextPainter(priceText, posColor);
       final double priceChipHeight = priceTP.height + 2 * padV;
-      final double priceTop = clampedY - priceChipHeight / 2;
+      double priceTop = clampedY - priceChipHeight / 2;
+      // keep price chip fully inside main chart rect
+      priceTop = priceTop
+          .clamp(mMainRect.top, mMainRect.bottom - priceChipHeight)
+          .toDouble();
       final double priceWidth = priceTP.width + 2 * padH;
       final double priceLeft = size.width - priceWidth; // right-aligned
       final RRect priceRRect = RRect.fromRectAndRadius(
@@ -719,7 +730,11 @@ class ChartPainter extends BaseChartPainter {
       final double chipTextHeight =
           (leftTP.height > rightTP.height ? leftTP.height : rightTP.height);
       final double chipHeight = chipTextHeight + 2 * padV;
-      final double chipTop = clampedY - chipHeight / 2;
+      double chipTop = clampedY - chipHeight / 2;
+      // keep left chip fully inside main chart rect
+      chipTop = chipTop
+          .clamp(mMainRect.top, mMainRect.bottom - chipHeight)
+          .toDouble();
 
       final double leftPartW = (leftText.isEmpty ? 0 : leftTP.width + 2 * padH);
       final double rightPartW =
@@ -945,6 +960,18 @@ class ChartPainter extends BaseChartPainter {
     }
     TextSpan span = TextSpan(text: "$text", style: getTextStyle(color));
     TextPainter tp = TextPainter(text: span, textDirection: TextDirection.ltr);
+    tp.layout();
+    return tp;
+  }
+
+  // smaller text painter for markers
+  TextPainter getMarkerTextPainter(String text) {
+    final TextSpan span = TextSpan(
+      text: text,
+      style: TextStyle(fontSize: 8.0, color: Colors.white),
+    );
+    final TextPainter tp =
+        TextPainter(text: span, textDirection: TextDirection.ltr);
     tp.layout();
     return tp;
   }
