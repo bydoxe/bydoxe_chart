@@ -5,6 +5,7 @@ import '../entity/info_window_entity.dart';
 import '../entity/k_line_entity.dart';
 import '../utils/date_format_util.dart';
 import 'base_chart_painter.dart';
+import '../entity/position_line_entity.dart';
 import 'base_chart_renderer.dart';
 import 'base_dimension.dart';
 import 'main_renderer.dart';
@@ -47,8 +48,29 @@ class ChartPainter extends BaseChartPainter {
   final ChartStyle chartStyle;
   final bool hideGrid;
   final bool showNowPrice;
+  double priceScale;
   final VerticalTextAlignment verticalTextAlignment;
+  final NowPriceLabelAlignment nowPriceLabelAlignment;
   final BaseDimension baseDimension;
+  final List<PositionLineEntity> positionLines;
+  final PositionLabelAlignment positionLabelAlignment;
+  final List<PositionMarkerEntity> markers;
+  int? activePositionId;
+  Map<int, Rect> _hitLeftChip = {};
+  Map<int, Rect> _hitBtnClose = {};
+  Map<int, Rect> _hitBtnTp = {};
+  Map<int, Rect> _hitBtnSl = {};
+  Rect? _nowPriceChipRect;
+  bool _nowPricePinned = false;
+
+  Rect? get nowPriceChipRect => _nowPriceChipRect;
+  bool get nowPricePinned => _nowPricePinned;
+
+  // getters to expose hit-test rects
+  Map<int, Rect> get hitLeftChip => _hitLeftChip;
+  Map<int, Rect> get hitBtnClose => _hitBtnClose;
+  Map<int, Rect> get hitBtnTp => _hitBtnTp;
+  Map<int, Rect> get hitBtnSl => _hitBtnSl;
 
   ChartPainter(
     this.chartStyle,
@@ -67,6 +89,11 @@ class ChartPainter extends BaseChartPainter {
     isOnTap,
     isTapShowInfoDialog,
     required this.verticalTextAlignment,
+    required this.nowPriceLabelAlignment,
+    required this.positionLines,
+    required this.positionLabelAlignment,
+    required this.markers,
+    this.activePositionId,
     mainStateLi,
     volHidden,
     secondaryStateLi,
@@ -75,6 +102,7 @@ class ChartPainter extends BaseChartPainter {
     this.showNowPrice = true,
     this.fixedLength = 2,
     this.maDayList = const [5, 10, 20],
+    this.priceScale = 1.0,
   }) : super(chartStyle,
             datas: datas,
             scaleX: scaleX,
@@ -122,6 +150,7 @@ class ChartPainter extends BaseChartPainter {
       this.chartColors,
       this.scaleX,
       verticalTextAlignment,
+      priceScale,
       maDayList,
     );
     if (mVolRect != null) {
@@ -195,6 +224,9 @@ class ChartPainter extends BaseChartPainter {
       mSecondaryRendererList.forEach((element) {
         element.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
       });
+
+      // render marker for this candle bucket (latest only)
+      _drawMarkerForCandle(canvas, curX, i, curPoint);
     }
 
     if ((isLongPress == true || (isTapShowInfoDialog && isOnTap)) &&
@@ -203,6 +235,71 @@ class ChartPainter extends BaseChartPainter {
     }
     if (isTrendLine == true) drawTrendLines(canvas, size);
     canvas.restore();
+  }
+
+  void _drawMarkerForCandle(Canvas canvas, double x, int i, KLineEntity k) {
+    if (markers.isEmpty) return;
+    final int t0 = k.time ?? 0;
+    final int t1 =
+        (i + 1 < datas!.length) ? (datas![i + 1].time ?? (t0 + 1)) : (1 << 62);
+    // 최신 것만: t0 <= time < t1 범위에서 마지막 항목
+    PositionMarkerEntity? chosen;
+    for (final m in markers) {
+      if (m.time >= t0 && m.time < t1) {
+        chosen = m; // overwrite to keep latest
+      }
+    }
+    if (chosen == null) return;
+    final Color color = chosen.color ??
+        ((chosen.type == MarkerType.buy)
+            ? chartColors.upColor
+            : chartColors.dnColor);
+    final String label = (chosen.type == MarkerType.buy) ? 'B' : 'S';
+    // bubble with tail pointing to candle (smaller)
+    final TextPainter tp = getMarkerTextPainter(label);
+    const double padH = 3.0;
+    const double padV = 1.5;
+    const double radius = 2.0;
+    const double tailH = 4.0;
+    final double bubbleW = tp.width + 2 * padH;
+    final double bubbleH = tp.height + 2 * padV;
+    final double bx = x - bubbleW / 2;
+    double by;
+    if (chosen.type == MarkerType.buy) {
+      final double lowY = getMainY(k.low);
+      by = lowY + 2 + tailH;
+      final Path tail = Path()
+        ..moveTo(x, lowY + 2)
+        ..lineTo(x - 3, by - 2)
+        ..lineTo(x + 3, by - 2)
+        ..close();
+      canvas.drawPath(
+          tail,
+          Paint()
+            ..color = color
+            ..isAntiAlias = true);
+    } else {
+      final double highY = getMainY(k.high);
+      by = highY - bubbleH - 2 - tailH;
+      final Path tail = Path()
+        ..moveTo(x, highY - 2)
+        ..lineTo(x - 3, by + bubbleH + 2)
+        ..lineTo(x + 3, by + bubbleH + 2)
+        ..close();
+      canvas.drawPath(
+          tail,
+          Paint()
+            ..color = color
+            ..isAntiAlias = true);
+    }
+    final RRect bubble = RRect.fromRectAndRadius(
+        Rect.fromLTWH(bx, by, bubbleW, bubbleH), Radius.circular(radius));
+    canvas.drawRRect(
+        bubble,
+        Paint()
+          ..color = color
+          ..isAntiAlias = true);
+    tp.paint(canvas, Offset(bx + padH, by + padV));
   }
 
   @override
@@ -397,43 +494,372 @@ class ChartPainter extends BaseChartPainter {
       y = getMainY(mMainHighMaxValue);
     }
 
-    nowPricePaint
-      ..color = value >= datas!.last.open
-          ? this.chartColors.nowPriceUpColor
-          : this.chartColors.nowPriceDnColor;
-    //first draw the horizontal line
-    double startX = 0;
-    final max = -mTranslateX + mWidth / scaleX;
-    final space =
-        this.chartStyle.nowPriceLineSpan + this.chartStyle.nowPriceLineLength;
-    while (startX < max) {
-      canvas.drawLine(
-          Offset(startX, y),
-          Offset(startX + this.chartStyle.nowPriceLineLength, y),
-          nowPricePaint);
-      startX += space;
-    }
-    //repaint the background and text
-    TextPainter tp = getTextPainter(
+    // Use a unified color regardless of up/down
+    final Color nowColor = this.chartColors.nowPriceUpColor;
+
+    // paddings unified with position right chip (reduced)
+    const double padH = 5.0;
+    const double padV = 2.0;
+    final double radius = 4.0;
+
+    // compute label text painter (slightly smaller font)
+    TextPainter tp = getChipTextPainter(
       value.toStringAsFixed(fixedLength),
-      this.chartColors.nowPriceTextColor,
+      nowColor,
     );
 
-    double offsetX;
-    switch (verticalTextAlignment) {
-      case VerticalTextAlignment.left:
-        offsetX = mWidth - tp.width;
+    // label horizontal position by alignment (chip size aware)
+    final double chipWidth = tp.width + 2 * padH;
+    final double chipHeight = tp.height + 2 * padV;
+    double labelLeft;
+    switch (nowPriceLabelAlignment) {
+      case NowPriceLabelAlignment.followVertical:
+        switch (verticalTextAlignment) {
+          case VerticalTextAlignment.left:
+            labelLeft = mWidth - chipWidth;
+            break;
+          case VerticalTextAlignment.right:
+            labelLeft = 0;
+            break;
+        }
         break;
-      case VerticalTextAlignment.right:
-        offsetX = 0;
+      case NowPriceLabelAlignment.left:
+        labelLeft = 0;
+        break;
+      case NowPriceLabelAlignment.right:
+        labelLeft = mWidth - chipWidth;
         break;
     }
 
-    double top = y - tp.height / 2;
-    canvas.drawRect(
-        Rect.fromLTRB(offsetX, top, offsetX + tp.width, top + tp.height),
-        nowPricePaint);
-    tp.paint(canvas, Offset(offsetX, top));
+    // draw dashed guide from last candle price x to chip edge only (default)
+    // but if lastX is off-screen to the left, pin label at 70% width and draw both sides
+    final int lastIndex = datas!.length - 1;
+    final double lastX = translateXtoX(getX(lastIndex));
+
+    bool offLeft = lastX < 0 || lastX > mWidth;
+    if (offLeft) {
+      // place label centered at 70% of width
+      final double targetCenter = mWidth * 0.70;
+      labelLeft = (targetCenter - chipWidth / 2).clamp(0.0, mWidth - chipWidth);
+    }
+
+    final double top = y - chipHeight / 2;
+    final RRect rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(labelLeft, top, chipWidth, chipHeight),
+      Radius.circular(radius),
+    );
+
+    // fill with selectFillColor and draw border with nowColor
+    final Paint bgPaint = Paint()
+      ..color = this.chartColors.selectFillColor
+      ..isAntiAlias = true;
+    final Paint borderPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = nowColor
+      ..isAntiAlias = true;
+
+    canvas.drawRRect(rrect, bgPaint);
+    canvas.drawRRect(rrect, borderPaint);
+    tp.paint(canvas, Offset(labelLeft + padH, top + padV));
+
+    // draw arrow icon when pinned (offLeft)
+    _nowPricePinned = offLeft;
+    if (offLeft) {
+      final double arrowW = 8;
+      final double arrowH = chipHeight * 0.5;
+      final double ax = labelLeft + chipWidth + 4;
+      final double ay = y - arrowH / 2;
+      final Path pth = Path()
+        ..moveTo(ax, ay)
+        ..lineTo(ax, ay + arrowH)
+        ..lineTo(ax + arrowW, ay + arrowH / 2)
+        ..close();
+      final Paint arrowPaint = Paint()
+        ..style = PaintingStyle.fill
+        ..color = nowColor
+        ..isAntiAlias = true;
+      canvas.drawPath(pth, arrowPaint);
+      // expand hit rect to include arrow
+      _nowPriceChipRect =
+          Rect.fromLTWH(labelLeft, top, chipWidth + 4 + arrowW, chipHeight);
+    } else {
+      _nowPriceChipRect = Rect.fromLTWH(labelLeft, top, chipWidth, chipHeight);
+    }
+
+    // dashed parameters (denser)
+    final Paint linePaint = Paint()
+      ..color = nowColor
+      ..strokeWidth = this.chartStyle.nowPriceLineWidth
+      ..isAntiAlias = true;
+    final double seg = this.chartStyle.nowPriceLineLength * 0.5;
+    final double gap = this.chartStyle.nowPriceLineSpan * 0.5;
+
+    if (offLeft) {
+      // draw left side from 0 -> labelLeft
+      double start = 0;
+      final double stop = labelLeft;
+      while (start < stop) {
+        final double next = (start + seg).clamp(start, stop);
+        canvas.drawLine(Offset(start, y), Offset(next, y), linePaint);
+        start = next + gap;
+      }
+      // draw right side from labelRight -> mWidth
+      double startR = labelLeft + chipWidth;
+      final double stopR = mWidth;
+      while (startR < stopR) {
+        final double next = (startR + seg).clamp(startR, stopR);
+        canvas.drawLine(Offset(startR, y), Offset(next, y), linePaint);
+        startR = next + gap;
+      }
+    } else {
+      // default: from lastX to chip edge
+      double endX;
+      if (labelLeft == 0) {
+        endX = labelLeft + chipWidth; // to right edge when left-aligned
+      } else {
+        endX = labelLeft; // to left edge when right-aligned
+      }
+
+      final double fromX = lastX.clamp(0, mWidth);
+      final double toX = endX.clamp(0, mWidth);
+
+      double start = fromX < toX ? fromX : toX;
+      final double stop = fromX < toX ? toX : fromX;
+      while (start < stop) {
+        final double next = (start + seg).clamp(start, stop);
+        canvas.drawLine(Offset(start, y), Offset(next, y), linePaint);
+        start = next + gap;
+      }
+    }
+  }
+
+  void drawPositionLines(Canvas canvas, Size size) {
+    if (positionLines.isEmpty) return;
+    _hitLeftChip.clear();
+    _hitBtnClose.clear();
+    _hitBtnTp.clear();
+    _hitBtnSl.clear();
+    for (final p in positionLines) {
+      // screen-space Y coordinate for position price
+      final double y = getMainY(p.price);
+      // If position price is outside current main chart Y-range, skip rendering (overflow hidden)
+      if (y < mMainRect.top || y > mMainRect.bottom) {
+        continue;
+      }
+      final double clampedY =
+          y.clamp(mMainRect.top, mMainRect.bottom).toDouble();
+
+      final Color posColor = p.color ??
+          ((p.isLong == null)
+              ? chartColors.avgColor
+              : (p.isLong! ? chartColors.upColor : chartColors.dnColor));
+
+      // 1) dashed horizontal guide across the screen
+      final double seg = chartStyle.nowPriceLineLength * 0.5;
+      final double gap = chartStyle.nowPriceLineSpan * 0.5;
+      final double space = seg + gap;
+      double startX = 0;
+      final Paint linePaint = Paint()
+        ..color = posColor
+        ..strokeWidth = p.lineWidth
+        ..isAntiAlias = true;
+      if (activePositionId == p.id) {
+        // solid line when active
+        canvas.drawLine(Offset(0, clampedY), Offset(size.width, clampedY),
+            linePaint..strokeWidth = p.lineWidth);
+      } else {
+        while (startX < size.width) {
+          canvas.drawLine(Offset(startX, clampedY),
+              Offset(startX + seg, clampedY), linePaint);
+          startX += space;
+        }
+      }
+
+      // common metrics (reduced)
+      const double padH = 5.0;
+      const double padV = 2.0;
+      final double radius = 4.0;
+
+      // 2) right-side price chip (bg=chart bg, colored border & text)
+      final String priceText = p.price.toStringAsFixed(fixedLength);
+      final TextPainter priceTP = getChipTextPainter(priceText, posColor);
+      final double priceChipHeight = priceTP.height + 2 * padV;
+      double priceTop = clampedY - priceChipHeight / 2;
+      // keep price chip fully inside main chart rect
+      priceTop = priceTop
+          .clamp(mMainRect.top, mMainRect.bottom - priceChipHeight)
+          .toDouble();
+      final double priceWidth = priceTP.width + 2 * padH;
+      final double priceLeft = size.width - priceWidth; // right-aligned
+      final RRect priceRRect = RRect.fromRectAndRadius(
+          Rect.fromLTWH(priceLeft, priceTop, priceWidth, priceChipHeight),
+          Radius.circular(radius));
+      final Paint priceBorder = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = posColor
+        ..isAntiAlias = true;
+      // fill with chart background, then draw border
+      canvas.drawRRect(
+          priceRRect,
+          Paint()
+            ..color = chartColors.bgColor
+            ..isAntiAlias = true);
+      canvas.drawRRect(priceRRect, priceBorder);
+      priceTP.paint(canvas, Offset(priceLeft + padH, priceTop + padV));
+
+      // 3) left-side split chip: [ filled side | outlined label ]
+      final double cur = datas!.last.close;
+      double pnlPct = 0;
+      if (p.price != 0) {
+        pnlPct = (p.isLong == true)
+            ? (cur - p.price) / p.price * 100
+            : (p.isLong == false)
+                ? (p.price - cur) / p.price * 100
+                : 0;
+      }
+      final String side =
+          (p.isLong == null) ? '' : (p.isLong! ? 'Long' : 'Short');
+      final String leftText =
+          side.isEmpty ? '' : ('$side ${pnlPct.toStringAsFixed(2)}%');
+      final String rightText = p.label ?? '';
+
+      final TextPainter leftTP = getChipTextPainter(leftText, Colors.white);
+      final TextPainter rightTP = getChipTextPainter(rightText, posColor);
+      final double chipTextHeight =
+          (leftTP.height > rightTP.height ? leftTP.height : rightTP.height);
+      final double chipHeight = chipTextHeight + 2 * padV;
+      double chipTop = clampedY - chipHeight / 2;
+      // keep left chip fully inside main chart rect
+      chipTop = chipTop
+          .clamp(mMainRect.top, mMainRect.bottom - chipHeight)
+          .toDouble();
+
+      final double leftPartW = (leftText.isEmpty ? 0 : leftTP.width + 2 * padH);
+      final double rightPartW =
+          (rightText.isEmpty ? 0 : rightTP.width + 2 * padH);
+      final double chipW = leftPartW + rightPartW;
+      if (chipW > 0) {
+        final double chipLeft = 0; // left-aligned at screen edge
+        final Rect leftRect =
+            Rect.fromLTWH(chipLeft, chipTop, leftPartW, chipHeight);
+        final Rect rightRect = Rect.fromLTWH(
+            chipLeft + leftPartW, chipTop, rightPartW, chipHeight);
+        final RRect chipRRect = RRect.fromRectAndRadius(
+            Rect.fromLTWH(chipLeft, chipTop, chipW, chipHeight),
+            Radius.circular(radius));
+
+        // draw outer border
+        final Paint chipBorder = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = posColor
+          ..isAntiAlias = true;
+        canvas.drawRRect(chipRRect, chipBorder);
+
+        // fill left part with posColor
+        if (leftPartW > 0) {
+          canvas.drawRRect(
+              RRect.fromRectAndRadius(leftRect, Radius.circular(radius)),
+              Paint()
+                ..color = posColor
+                ..isAntiAlias = true);
+          leftTP.paint(
+              canvas, Offset(leftRect.left + padH, leftRect.top + padV));
+          _hitLeftChip[p.id] = leftRect;
+        }
+
+        // right part background = chart bg color for contrast
+        if (rightPartW > 0) {
+          canvas.drawRRect(
+              RRect.fromRectAndRadius(rightRect, Radius.circular(radius)),
+              Paint()
+                ..color = chartColors.bgColor
+                ..isAntiAlias = true);
+          rightTP.paint(
+              canvas, Offset(rightRect.left + padH, rightRect.top + padV));
+        }
+
+        // if active, draw action buttons next to right part
+        if (activePositionId == p.id) {
+          double btnLeft = chipLeft + chipW + 6;
+          final Size btnSize = Size(28, chipHeight);
+          Rect btnRectClose =
+              Rect.fromLTWH(btnLeft, chipTop, btnSize.width, btnSize.height);
+          Rect btnRectTp = Rect.fromLTWH(
+              btnRectClose.right + 4, chipTop, btnSize.width, btnSize.height);
+          Rect btnRectSl = Rect.fromLTWH(
+              btnRectTp.right + 4, chipTop, btnSize.width, btnSize.height);
+
+          final Paint btnBorder = Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1
+            ..color = posColor
+            ..isAntiAlias = true;
+          final Paint btnBg = Paint()
+            ..color = chartColors.bgColor
+            ..isAntiAlias = true;
+
+          // Close button (×)
+          canvas.drawRRect(
+              RRect.fromRectAndRadius(btnRectClose, Radius.circular(radius)),
+              btnBg);
+          canvas.drawRRect(
+              RRect.fromRectAndRadius(btnRectClose, Radius.circular(radius)),
+              btnBorder);
+          getChipTextPainter('×', posColor).paint(
+              canvas,
+              Offset(
+                  btnRectClose.left +
+                      (btnSize.width -
+                              getChipTextPainter('×', posColor).width) /
+                          2,
+                  chipTop + padV));
+
+          // TP button
+          canvas.drawRRect(
+              RRect.fromRectAndRadius(btnRectTp, Radius.circular(radius)),
+              btnBg);
+          canvas.drawRRect(
+              RRect.fromRectAndRadius(btnRectTp, Radius.circular(radius)),
+              btnBorder);
+          getChipTextPainter('TP', posColor).paint(
+              canvas,
+              Offset(
+                  btnRectTp.left +
+                      (btnSize.width -
+                              getChipTextPainter('TP', posColor).width) /
+                          2,
+                  chipTop + padV));
+
+          // SL button
+          canvas.drawRRect(
+              RRect.fromRectAndRadius(btnRectSl, Radius.circular(radius)),
+              btnBg);
+          canvas.drawRRect(
+              RRect.fromRectAndRadius(btnRectSl, Radius.circular(radius)),
+              btnBorder);
+          getChipTextPainter('SL', posColor).paint(
+              canvas,
+              Offset(
+                  btnRectSl.left +
+                      (btnSize.width -
+                              getChipTextPainter('SL', posColor).width) /
+                          2,
+                  chipTop + padV));
+
+          _hitBtnClose[p.id] = btnRectClose;
+          _hitBtnTp[p.id] = btnRectTp;
+          _hitBtnSl[p.id] = btnRectSl;
+        }
+      }
+    }
+  }
+
+  @override
+  void drawOverlays(Canvas canvas, Size size) {
+    drawPositionLines(canvas, size);
   }
 
   //For TrendLine
@@ -538,6 +964,18 @@ class ChartPainter extends BaseChartPainter {
     return tp;
   }
 
+  // smaller text painter for markers
+  TextPainter getMarkerTextPainter(String text) {
+    final TextSpan span = TextSpan(
+      text: text,
+      style: TextStyle(fontSize: 8.0, color: Colors.white),
+    );
+    final TextPainter tp =
+        TextPainter(text: span, textDirection: TextDirection.ltr);
+    tp.layout();
+    return tp;
+  }
+
   String getDate(int? date) => dateFormat(
         DateTime.fromMillisecondsSinceEpoch(
             date ?? DateTime.now().millisecondsSinceEpoch),
@@ -555,5 +993,17 @@ class ChartPainter extends BaseChartPainter {
   /// Whether the point is in MainRect
   bool isInMainRect(Offset point) {
     return mMainRect.contains(point);
+  }
+
+  // helper: smaller font for chips only
+  TextPainter getChipTextPainter(String text, Color color) {
+    final TextSpan span = TextSpan(
+      text: text,
+      style: TextStyle(fontSize: 9.0, color: color),
+    );
+    final TextPainter tp =
+        TextPainter(text: span, textDirection: TextDirection.ltr);
+    tp.layout();
+    return tp;
   }
 }

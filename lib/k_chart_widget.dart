@@ -4,6 +4,9 @@ import 'package:bydoxe_chart/chart_translations.dart';
 import 'package:bydoxe_chart/components/popup_info_view.dart';
 import 'package:bydoxe_chart/k_chart_plus.dart';
 import 'renderer/base_dimension.dart';
+import 'renderer/main_renderer.dart'
+    show NowPriceLabelAlignment, VerticalTextAlignment, PositionLabelAlignment;
+import 'entity/position_line_entity.dart';
 
 enum MainState { MA, BOLL, SAR }
 
@@ -46,6 +49,11 @@ class KChartWidget extends StatefulWidget {
   // If it is false, it will be scrolled to the end of the left side of the screen.
   final Function(bool)? onLoadMore;
 
+  /// 양 끝(좌/우) 도달 시, 해당 방향과 함께 페이징 기준 타임스탬프를 전달합니다.
+  /// - isLeft=true: 현재 첫 봉 시간 - 1ms
+  /// - isLeft=false: 현재 마지막 봉 시간 + 1ms
+  final void Function(bool isLeft, int ts)? onEdgeLoadTs;
+
   final int fixedLength;
   final List<int> maDayList;
   final int flingTime;
@@ -55,6 +63,11 @@ class KChartWidget extends StatefulWidget {
   final ChartColors chartColors;
   final ChartStyle chartStyle;
   final VerticalTextAlignment verticalTextAlignment;
+  final NowPriceLabelAlignment nowPriceLabelAlignment;
+  final List<PositionLineEntity> positionLines;
+  final PositionLabelAlignment positionLabelAlignment;
+  final void Function(int id, PositionAction action)? onPositionAction;
+  final List<PositionMarkerEntity> markers;
   final bool isTrendLine;
   final double xFrontPadding;
 
@@ -77,6 +90,7 @@ class KChartWidget extends StatefulWidget {
     this.chartTranslations = const ChartTranslations(),
     this.timeFormat = TimeFormat.YEAR_MONTH_DAY,
     this.onLoadMore,
+    this.onEdgeLoadTs,
     this.fixedLength = 2,
     this.maDayList = const [5, 10, 20],
     this.flingTime = 600,
@@ -84,6 +98,11 @@ class KChartWidget extends StatefulWidget {
     this.flingCurve = Curves.decelerate,
     this.isOnDrag,
     this.verticalTextAlignment = VerticalTextAlignment.left,
+    this.nowPriceLabelAlignment = NowPriceLabelAlignment.followVertical,
+    this.positionLines = const <PositionLineEntity>[],
+    this.positionLabelAlignment = PositionLabelAlignment.left,
+    this.onPositionAction,
+    this.markers = const <PositionMarkerEntity>[],
     this.mBaseHeight = 360,
   });
 
@@ -97,11 +116,13 @@ class _KChartWidgetState extends State<KChartWidget>
       StreamController<InfoWindowEntity?>();
   double mScaleX = 1.0, mScrollX = 0.0, mSelectX = 0.0;
   double mHeight = 0, mWidth = 0;
+  double _priceScale = 1.0;
   AnimationController? _controller;
   Animation<double>? aniX;
 
   //For TrendLine
   List<TrendLine> lines = [];
+  int? activePositionId;
   double? changeinXposition;
   double? changeinYposition;
   double mSelectY = 0.0;
@@ -170,6 +191,12 @@ class _KChartWidgetState extends State<KChartWidget>
       fixedLength: widget.fixedLength,
       maDayList: widget.maDayList,
       verticalTextAlignment: widget.verticalTextAlignment,
+      nowPriceLabelAlignment: widget.nowPriceLabelAlignment,
+      positionLines: widget.positionLines,
+      positionLabelAlignment: widget.positionLabelAlignment,
+      markers: widget.markers,
+      activePositionId: activePositionId,
+      priceScale: _priceScale,
     );
 
     return LayoutBuilder(
@@ -185,11 +212,48 @@ class _KChartWidgetState extends State<KChartWidget>
             if (!widget.isTrendLine &&
                 _painter.isInMainRect(details.localPosition)) {
               isOnTap = true;
+              // hit test position chips/buttons first
+              final hit =
+                  _hitTestPosition(details.localPosition, _painter) ?? false;
+              // if not hit on position elements, check now price chip when pinned
+              if (!hit && _painter.nowPricePinned == true) {
+                final Rect? chipRect = _painter.nowPriceChipRect;
+                if (chipRect != null &&
+                    chipRect.contains(details.localPosition)) {
+                  // jump to latest: scroll to rightmost
+                  setState(() {
+                    // Jump to latest candle (rightmost): scrollX = 0
+                    mScrollX = 0;
+                  });
+                  notifyChanged();
+                  return;
+                }
+              }
+              if (hit == true) {
+                return;
+              }
+              // if any active position exists and tap didn't hit chips/buttons, close it
+              if (activePositionId != null) {
+                setState(() {
+                  activePositionId = null;
+                  _painter.activePositionId = null;
+                });
+                return;
+              }
               if (mSelectX != details.localPosition.dx &&
                   widget.isTapShowInfoDialog) {
                 mSelectX = details.localPosition.dx;
                 notifyChanged();
               }
+            }
+            // tap outside main rect closes active position as well
+            if (activePositionId != null &&
+                !_painter.isInMainRect(details.localPosition)) {
+              setState(() {
+                activePositionId = null;
+                _painter.activePositionId = null;
+              });
+              return;
             }
             if (widget.isTrendLine && !isLongPress && enableCordRecord) {
               enableCordRecord = false;
@@ -291,12 +355,68 @@ class _KChartWidgetState extends State<KChartWidget>
                 size: Size(double.infinity, baseDimension.mDisplayHeight),
                 painter: _painter,
               ),
-              if (widget.showInfoDialog) _buildInfoDialog()
+              if (widget.showInfoDialog) _buildInfoDialog(),
+              // 우측 가격축 전용 수직 드래그 제스처 레이어(56px)
+              Positioned(
+                top: 0,
+                right: 0,
+                bottom: 0,
+                width: 56,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onVerticalDragUpdate: (details) {
+                    final double dy = details.primaryDelta ?? 0;
+                    final double factor = 1.0 - dy * 0.005;
+                    // allow zoom-in and zoom-out; renderer will clamp to extremes
+                    _priceScale = (_priceScale * factor).clamp(0.2, 50.0);
+                    notifyChanged();
+                  },
+                ),
+              ),
             ],
           ),
         );
       },
     );
+  }
+
+  // hit test against painter-stored rects
+  bool? _hitTestPosition(Offset pos, ChartPainter painter) {
+    // expose painter maps through getters
+    final left = painter.hitLeftChip;
+    final close = painter.hitBtnClose;
+    final tp = painter.hitBtnTp;
+    final sl = painter.hitBtnSl;
+
+    for (final e in left.entries) {
+      if (e.value.contains(pos)) {
+        // toggle active id
+        setState(() {
+          activePositionId = (activePositionId == e.key) ? null : e.key;
+          painter.activePositionId = activePositionId;
+        });
+        return true;
+      }
+    }
+    for (final e in close.entries) {
+      if (e.value.contains(pos)) {
+        widget.onPositionAction?.call(e.key, PositionAction.close);
+        return true;
+      }
+    }
+    for (final e in tp.entries) {
+      if (e.value.contains(pos)) {
+        widget.onPositionAction?.call(e.key, PositionAction.tp);
+        return true;
+      }
+    }
+    for (final e in sl.entries) {
+      if (e.value.contains(pos)) {
+        widget.onPositionAction?.call(e.key, PositionAction.sl);
+        return true;
+      }
+    }
+    return null;
   }
 
   void _stopAnimation({bool needNotify = true}) {
@@ -330,11 +450,28 @@ class _KChartWidgetState extends State<KChartWidget>
         if (widget.onLoadMore != null) {
           widget.onLoadMore!(true);
         }
+        // 좌측 끝 도달 시 공통 콜백(onEdgeLoadTs)만 사용
+        // 공통 콜백: 좌측 끝 기준 타임스탬프 전달 (요청 사양)
+        // true => lastTimeMs + 1
+        if (widget.onEdgeLoadTs != null &&
+            widget.datas != null &&
+            widget.datas!.isNotEmpty) {
+          final int lastTimeMs = widget.datas!.last.time ?? 0;
+          widget.onEdgeLoadTs!(true, lastTimeMs + 1);
+        }
         _stopAnimation();
       } else if (mScrollX >= ChartPainter.maxScrollX) {
         mScrollX = ChartPainter.maxScrollX;
         if (widget.onLoadMore != null) {
           widget.onLoadMore!(false);
+        }
+        // 공통 콜백: 우측 끝 기준 타임스탬프 전달 (요청 사양)
+        // false => firstTimeMs - 1
+        if (widget.onEdgeLoadTs != null &&
+            widget.datas != null &&
+            widget.datas!.isNotEmpty) {
+          final int firstTimeMs = widget.datas!.first.time ?? 0;
+          widget.onEdgeLoadTs!(false, firstTimeMs - 1);
         }
         _stopAnimation();
       }
