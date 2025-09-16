@@ -42,6 +42,9 @@ class PositionLineEntity {
   /// Line width. Defaults to 1.0
   final double lineWidth;
 
+  /// Leverage for ROE calculation. 0 means no leverage (baseline)
+  final int leverage;
+
   const PositionLineEntity({
     required this.id,
     required this.price,
@@ -49,5 +52,6 @@ class PositionLineEntity {
     this.label,
     this.color,
     this.lineWidth = 1.0,
+    this.leverage = 0,
   });
 }
