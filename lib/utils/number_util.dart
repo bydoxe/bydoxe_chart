@@ -1,6 +1,23 @@
 import 'dart:math';
 
 class NumberUtil {
+  static String calculateUnrealizedRoe(
+      String entryPrice, String exitPrice, int leverage, String side) {
+    final double entryPriceDouble = double.tryParse(entryPrice) ?? 0.0;
+    final double exitPriceDouble = double.tryParse(exitPrice) ?? 0.0;
+
+    final double priceDiff = side.toUpperCase() == 'LONG'
+        ? exitPriceDouble - entryPriceDouble
+        : entryPriceDouble - exitPriceDouble;
+
+    final double parent = leverage == 0
+        ? (entryPriceDouble == 0 ? 1.0 : entryPriceDouble)
+        : (entryPriceDouble / leverage);
+    final double roe =
+        (priceDiff == 0 || parent == 0) ? 0.0 : (priceDiff / parent) * 100.0;
+    return roe.toStringAsFixed(2);
+  }
+
   static String format(double n) {
     if (n >= 1000000000) {
       n /= 1000000000;

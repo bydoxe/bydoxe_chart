@@ -728,18 +728,15 @@ class ChartPainter extends BaseChartPainter {
 
       // 3) left-side split chip: [ filled side | outlined label ]
       final double cur = datas!.last.close;
-      double pnlPct = 0;
-      if (p.price != 0) {
-        pnlPct = (p.isLong == true)
-            ? (cur - p.price) / p.price * 100
-            : (p.isLong == false)
-                ? (p.price - cur) / p.price * 100
-                : 0;
-      }
       final String side =
-          (p.isLong == null) ? '' : (p.isLong! ? 'Long' : 'Short');
-      final String leftText =
-          side.isEmpty ? '' : ('$side ${pnlPct.toStringAsFixed(2)}%');
+          (p.isLong == null) ? '' : (p.isLong! ? 'LONG' : 'SHORT');
+      final String roeStr = NumberUtil.calculateUnrealizedRoe(
+        p.price.toStringAsFixed(fixedLength),
+        cur.toStringAsFixed(fixedLength),
+        p.leverage,
+        side,
+      );
+      final String leftText = side.isEmpty ? '' : ('$side $roeStr%');
       final String rightText = p.label ?? '';
 
       final TextPainter leftTP = getChipTextPainter(leftText, Colors.white);
