@@ -242,64 +242,81 @@ class ChartPainter extends BaseChartPainter {
     final int t0 = k.time ?? 0;
     final int t1 =
         (i + 1 < datas!.length) ? (datas![i + 1].time ?? (t0 + 1)) : (1 << 62);
-    // 최신 것만: t0 <= time < t1 범위에서 마지막 항목
-    PositionMarkerEntity? chosen;
+
+    // 동일 분봉 내에서 타입별 최신 1개씩 선택: BUY, SELL 각각 최신
+    PositionMarkerEntity? chosenBuy;
+    PositionMarkerEntity? chosenSell;
     for (final m in markers) {
       if (m.time >= t0 && m.time < t1) {
-        chosen = m; // overwrite to keep latest
+        if (m.type == MarkerType.buy) {
+          if (chosenBuy == null || m.time >= chosenBuy.time) {
+            chosenBuy = m;
+          }
+        } else {
+          if (chosenSell == null || m.time >= chosenSell.time) {
+            chosenSell = m;
+          }
+        }
       }
     }
-    if (chosen == null) return;
-    final Color color = chosen.color ??
-        ((chosen.type == MarkerType.buy)
-            ? chartColors.upColor
-            : chartColors.dnColor);
-    final String label = (chosen.type == MarkerType.buy) ? 'B' : 'S';
-    // bubble with tail pointing to candle (smaller)
-    final TextPainter tp = getMarkerTextPainter(label);
-    const double padH = 3.0;
-    const double padV = 1.5;
-    const double radius = 2.0;
-    const double tailH = 4.0;
-    final double bubbleW = tp.width + 2 * padH;
-    final double bubbleH = tp.height + 2 * padV;
-    final double bx = x - bubbleW / 2;
-    double by;
-    if (chosen.type == MarkerType.buy) {
-      final double lowY = getMainY(k.low);
-      by = lowY + 2 + tailH;
-      final Path tail = Path()
-        ..moveTo(x, lowY + 2)
-        ..lineTo(x - 3, by - 2)
-        ..lineTo(x + 3, by - 2)
-        ..close();
-      canvas.drawPath(
-          tail,
+    if (chosenBuy == null && chosenSell == null) return;
+
+    void drawOne(PositionMarkerEntity chosen) {
+      final Color color = chosen.color ??
+          ((chosen.type == MarkerType.buy)
+              ? chartColors.upColor
+              : chartColors.dnColor);
+      final String label = (chosen.type == MarkerType.buy) ? 'B' : 'S';
+      // bubble with tail pointing to candle (smaller)
+      final TextPainter tp = getMarkerTextPainter(label);
+      const double padH = 3.0;
+      const double padV = 1.5;
+      const double radius = 2.0;
+      const double tailH = 4.0;
+      final double bubbleW = tp.width + 2 * padH;
+      final double bubbleH = tp.height + 2 * padV;
+      final double bx = x - bubbleW / 2;
+      double by;
+      if (chosen.type == MarkerType.buy) {
+        final double lowY = getMainY(k.low);
+        by = lowY + 2 + tailH;
+        final Path tail = Path()
+          ..moveTo(x, lowY + 2)
+          ..lineTo(x - 3, by - 2)
+          ..lineTo(x + 3, by - 2)
+          ..close();
+        canvas.drawPath(
+            tail,
+            Paint()
+              ..color = color
+              ..isAntiAlias = true);
+      } else {
+        final double highY = getMainY(k.high);
+        by = highY - bubbleH - 2 - tailH;
+        final Path tail = Path()
+          ..moveTo(x, highY - 2)
+          ..lineTo(x - 3, by + bubbleH + 2)
+          ..lineTo(x + 3, by + bubbleH + 2)
+          ..close();
+        canvas.drawPath(
+            tail,
+            Paint()
+              ..color = color
+              ..isAntiAlias = true);
+      }
+      final RRect bubble = RRect.fromRectAndRadius(
+          Rect.fromLTWH(bx, by, bubbleW, bubbleH), Radius.circular(radius));
+      canvas.drawRRect(
+          bubble,
           Paint()
             ..color = color
             ..isAntiAlias = true);
-    } else {
-      final double highY = getMainY(k.high);
-      by = highY - bubbleH - 2 - tailH;
-      final Path tail = Path()
-        ..moveTo(x, highY - 2)
-        ..lineTo(x - 3, by + bubbleH + 2)
-        ..lineTo(x + 3, by + bubbleH + 2)
-        ..close();
-      canvas.drawPath(
-          tail,
-          Paint()
-            ..color = color
-            ..isAntiAlias = true);
+      tp.paint(canvas, Offset(bx + padH, by + padV));
     }
-    final RRect bubble = RRect.fromRectAndRadius(
-        Rect.fromLTWH(bx, by, bubbleW, bubbleH), Radius.circular(radius));
-    canvas.drawRRect(
-        bubble,
-        Paint()
-          ..color = color
-          ..isAntiAlias = true);
-    tp.paint(canvas, Offset(bx + padH, by + padV));
+
+    // BUY, SELL 둘 다 있으면 모두 표기. 타입별 최신 1개만 표시
+    if (chosenBuy != null) drawOne(chosenBuy);
+    if (chosenSell != null) drawOne(chosenSell);
   }
 
   @override
