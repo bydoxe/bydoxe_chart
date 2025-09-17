@@ -401,18 +401,30 @@ class _KChartWidgetState extends State<KChartWidget>
     for (final e in close.entries) {
       if (e.value.contains(pos)) {
         widget.onPositionAction?.call(e.key, PositionAction.close);
+        setState(() {
+          activePositionId = null;
+          painter.activePositionId = null;
+        });
         return true;
       }
     }
     for (final e in tp.entries) {
       if (e.value.contains(pos)) {
         widget.onPositionAction?.call(e.key, PositionAction.tp);
+        setState(() {
+          activePositionId = null;
+          painter.activePositionId = null;
+        });
         return true;
       }
     }
     for (final e in sl.entries) {
       if (e.value.contains(pos)) {
         widget.onPositionAction?.call(e.key, PositionAction.sl);
+        setState(() {
+          activePositionId = null;
+          painter.activePositionId = null;
+        });
         return true;
       }
     }
