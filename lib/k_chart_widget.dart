@@ -7,7 +7,7 @@ import 'renderer/base_dimension.dart';
 
 enum MainState { MA, BOLL, SAR, EMA, AVL }
 
-enum SecondaryState { MACD, KDJ, RSI, WR }
+enum SecondaryState { MACD, KDJ, RSI, WR, OBV, STOCHRSI }
 
 class TimeFormat {
   static const List<String> YEAR_MONTH_DAY = [yyyy, '-', mm, '-', dd];
@@ -69,10 +69,15 @@ class KChartWidget extends StatefulWidget {
   final double xFrontPadding;
   final List<IndicatorMA>? indicatorMA;
   final List<IndicatorEMA>? indicatorEMA;
+  final List<RSIInputEntity>? indicatorRSI;
   final IndicatorBOLL? indicatorBOLL;
   final IndicatorSAR? indicatorSAR;
   final IndicatorAVL? indicatorAVL;
   final List<IndicatorVolMA>? indicatorVolMA; // up to 2
+  final MACDInputEntity? indicatorMACD;
+  final WRInputEntity? indicatorWR;
+  final OBVInputEntity? indicatorOBV;
+  final StochRSIInputEntity? indicatorStochRSI;
 
   KChartWidget(
     this.datas,
@@ -113,6 +118,11 @@ class KChartWidget extends StatefulWidget {
     this.indicatorSAR,
     this.indicatorAVL,
     this.indicatorVolMA,
+    this.indicatorMACD,
+    this.indicatorRSI,
+    this.indicatorWR,
+    this.indicatorOBV,
+    this.indicatorStochRSI,
   });
 
   @override
@@ -208,10 +218,15 @@ class _KChartWidgetState extends State<KChartWidget>
       priceScale: _priceScale,
       indicatorMA: widget.indicatorMA,
       indicatorEMA: widget.indicatorEMA,
+      indicatorRSI: widget.indicatorRSI,
       indicatorBOLL: widget.indicatorBOLL,
       indicatorSAR: widget.indicatorSAR,
       indicatorAVL: widget.indicatorAVL,
       indicatorVolMA: widget.indicatorVolMA,
+      indicatorMACD: widget.indicatorMACD,
+      indicatorWR: widget.indicatorWR,
+      indicatorOBV: widget.indicatorOBV,
+      indicatorStochRSI: widget.indicatorStochRSI,
     );
 
     return LayoutBuilder(

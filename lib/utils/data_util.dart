@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:math' as math;
 
 import '../entity/index.dart';
 
@@ -275,6 +276,45 @@ class DataUtil {
     }
   }
 
+  /// MACD with configurable periods using EMA smoothing
+  /// shortPeriod, longPeriod, maPeriod must be >= 1
+  static void calcMACDWithParams(
+    List<KLineEntity> dataList, {
+    int shortPeriod = 12,
+    int longPeriod = 26,
+    int maPeriod = 9,
+  }) {
+    if (dataList.isEmpty) return;
+    final int s = shortPeriod <= 1 ? 1 : shortPeriod;
+    final int l = longPeriod <= 1 ? 1 : longPeriod;
+    final int m = maPeriod <= 1 ? 1 : maPeriod;
+
+    double emaShort = 0.0;
+    double emaLong = 0.0;
+    double dea = 0.0;
+    final double alphaS = 2.0 / (s + 1);
+    final double alphaL = 2.0 / (l + 1);
+    final double alphaM = 2.0 / (m + 1);
+
+    for (int i = 0; i < dataList.length; i++) {
+      final KLineEntity e = dataList[i];
+      if (i == 0) {
+        emaShort = e.close;
+        emaLong = e.close;
+        dea = 0.0;
+      } else {
+        emaShort = alphaS * e.close + (1 - alphaS) * emaShort;
+        emaLong = alphaL * e.close + (1 - alphaL) * emaLong;
+      }
+      final double dif = emaShort - emaLong;
+      dea = alphaM * dif + (1 - alphaM) * dea;
+      final double macd = (dif - dea) * 2;
+      e.dif = dif;
+      e.dea = dea;
+      e.macd = macd;
+    }
+  }
+
   static void calcVolumeMA(List<KLineEntity> dataList) {
     double volumeMa5 = 0;
     double volumeMa10 = 0;
@@ -328,6 +368,50 @@ class DataUtil {
     }
   }
 
+  /// Calculate OBV, OBV-MA, OBV-EMA
+  static void calcOBV(
+    List<KLineEntity> dataList, {
+    int maPeriod = 10,
+    int emaPeriod = 10,
+  }) {
+    if (dataList.isEmpty) return;
+    double obv = 0.0;
+    double obvEma = 0.0;
+    final int m = maPeriod <= 1 ? 1 : maPeriod;
+    final int e = emaPeriod <= 1 ? 1 : emaPeriod;
+    final double alpha = 2.0 / (e + 1);
+    final List<double> window = [];
+    for (int i = 0; i < dataList.length; i++) {
+      final cur = dataList[i];
+      final prev = dataList[math.max(0, i - 1)];
+      if (i == 0) {
+        obv = 0.0;
+      } else {
+        // use volume normalized by close price
+        final double unit = (cur.close == 0) ? 0.0 : (cur.vol / cur.close);
+        if (cur.close > prev.close) {
+          obv += unit;
+        } else if (cur.close < prev.close) {
+          obv -= unit;
+        }
+      }
+      cur.obv = obv;
+      // MA
+      window.add(obv);
+      if (window.length > m) window.removeAt(0);
+      cur.obvMA = window.isEmpty
+          ? 0.0
+          : (window.reduce((a, b) => a + b) / window.length);
+      // EMA
+      if (i == 0) {
+        obvEma = obv;
+      } else {
+        obvEma = alpha * obv + (1 - alpha) * obvEma;
+      }
+      cur.obvEMA = obvEma;
+    }
+  }
+
   static void calcRSI(List<KLineEntity> dataList) {
     double? rsi;
     double rsiABSEma = 0;
@@ -350,6 +434,111 @@ class DataUtil {
       if (i < 13) rsi = null;
       if (rsi != null && rsi.isNaN) rsi = null;
       entity.rsi = rsi;
+    }
+  }
+
+  /// Calculate StochRSI (K, D lines)
+  static void calcStochRSI(
+    List<KLineEntity> dataList, {
+    int lengthRSI = 14,
+    int lengthStoch = 14,
+    int smoothK = 3,
+    int smoothD = 3,
+  }) {
+    if (dataList.isEmpty) return;
+    // 1) Precompute RSI(lengthRSI)
+    final List<double?> rsiArr = List<double?>.filled(dataList.length, null);
+    double? rsi;
+    double rsiABSEma = 0;
+    double rsiMaxEma = 0;
+    for (int i = 0; i < dataList.length; i++) {
+      final e = dataList[i];
+      if (i == 0) {
+        rsi = 0;
+        rsiABSEma = 0;
+        rsiMaxEma = 0;
+      } else {
+        final double diff = e.close - dataList[i - 1].close;
+        final double rMax = max(0, diff);
+        final double rAbs = diff.abs();
+        rsiMaxEma = (rMax + (lengthRSI - 1) * rsiMaxEma) / lengthRSI;
+        rsiABSEma = (rAbs + (lengthRSI - 1) * rsiABSEma) / lengthRSI;
+        rsi = (rsiABSEma == 0) ? 0 : (rsiMaxEma / rsiABSEma) * 100.0;
+      }
+      if (i < lengthRSI - 1) rsi = 0;
+      rsiArr[i] = rsi;
+    }
+
+    // 2) StochRSI over window lengthStoch
+    final List<double> rawK = List<double>.filled(dataList.length, 0.0);
+    for (int i = 0; i < dataList.length; i++) {
+      final int start = max(0, i - lengthStoch + 1);
+      double rMin = double.maxFinite, rMax = -double.maxFinite;
+      for (int j = start; j <= i; j++) {
+        final v = rsiArr[j] ?? 0.0;
+        if (v < rMin) rMin = v;
+        if (v > rMax) rMax = v;
+      }
+      final double denom = (rMax - rMin).abs();
+      rawK[i] = (denom == 0) ? 0.0 : ((rsiArr[i]! - rMin) / denom) * 100.0;
+    }
+
+    // 3) Smooth K and D with simple moving average
+    double sma(List<double> arr, int end, int win) {
+      final int start = max(0, end - win + 1);
+      double sum = 0.0;
+      int cnt = 0;
+      for (int i = start; i <= end; i++) {
+        sum += arr[i];
+        cnt++;
+      }
+      return cnt == 0 ? 0.0 : sum / cnt;
+    }
+
+    for (int i = 0; i < dataList.length; i++) {
+      final double k = sma(rawK, i, smoothK);
+      // D = SMA(K, smoothD)
+      final List<double> kSeries =
+          List<double>.generate(i + 1, (t) => sma(rawK, t, smoothK));
+      final double dFixed = sma(kSeries, i, smoothD);
+      dataList[i].stochK = k;
+      dataList[i].stochD = dFixed;
+    }
+
+    // Debug logging removed
+  }
+
+  /// Calculate multiple RSI series and store in rsiValueList (max 3 periods)
+  static void calcRSIList(List<KLineEntity> dataList, List<int> periods) {
+    if (dataList.isEmpty || periods.isEmpty) return;
+    final List<int> ps = periods.take(3).toList();
+    final int n = ps.length;
+    final List<double> absEma = List<double>.filled(n, 0.0);
+    final List<double> maxEma = List<double>.filled(n, 0.0);
+    for (int i = 0; i < dataList.length; i++) {
+      final KLineEntity e = dataList[i];
+      e.rsiValueList = List<double>.filled(n, 0.0);
+      if (i == 0) {
+        // seed
+        for (int j = 0; j < n; j++) {
+          absEma[j] = 0.0;
+          maxEma[j] = 0.0;
+          e.rsiValueList![j] = 0.0;
+        }
+        continue;
+      }
+      final double change = e.close - dataList[i - 1].close;
+      final double rMax = math.max(0, change);
+      final double rAbs = change.abs();
+      for (int j = 0; j < n; j++) {
+        final int p = ps[j] <= 1 ? 1 : ps[j];
+        maxEma[j] = (rMax + (p - 1) * maxEma[j]) / p;
+        absEma[j] = (rAbs + (p - 1) * absEma[j]) / p;
+        final double denom = absEma[j] == 0 ? 0.0 : absEma[j];
+        double value = denom == 0.0 ? 0.0 : (maxEma[j] / denom) * 100.0;
+        if (i < (p - 1)) value = 0.0;
+        e.rsiValueList![j] = value;
+      }
     }
   }
 

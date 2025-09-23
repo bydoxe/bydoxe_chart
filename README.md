@@ -4,7 +4,7 @@
 
 - **차트 유형**: 캔들(봉), 라인 차트, 거래량(Vol), 보조지표 다중 표기, 호가 뎁스(Depth) 차트
   - **메인 지표**: MA, EMA, BOLL, SAR, AVL(평균가)
-  - **보조 지표**: MACD, KDJ, RSI, WR (여러 개 동시 표시 지원)
+  - **보조 지표**: MACD, KDJ, RSI, WR, OBV, StochRSI (여러 개 동시 표시 지원)
 - **상호작용**: 드래그 스크롤, 핀치 줌, 플링(가속 스크롤), 롱프레스 십자선/데이터 조회, 탭 기반 정보 팝업, 추세선(TrendLine) 모드로 차트 상 라인 그리기, 우측 가격축 드래그로 수직 스케일 조정(기본 표시 범위보다 더 넓게만 확장; 축소는 제한)
 - **렌더링/성능**: 가시 구간만 계산/렌더, 이진 탐색 기반 인덱싱, 최대 스크롤 범위 관리, `onLoadMore(bool isLeft)` 콜백으로 양 끝 도달 시 추가 로딩 트리거
 - **표시 요소**: 현재가 점선/라벨, 구간 내 고가/저가 표기, 격자 표시 토글, 좌/우 수직축 정렬, 시간 표시 자동 포맷(주기 추론) 및 커스텀 포맷 지원
@@ -15,8 +15,9 @@
 
 ## 데이터/유틸
 
-- **엔티티**: `KLineEntity`(open/high/low/close/vol/amount/time 등), `CandleEntity`, `VolumeEntity`, `MACDEntity`, `KDJEntity`, `RSIEntity`, `RWEntity`, `DepthEntity`, `InfoWindowEntity`
+- **엔티티**: `KLineEntity`(open/high/low/close/vol/amount/time 등), `CandleEntity`, `VolumeEntity`, `MACDEntity`, `KDJEntity`, `RSIEntity`, `RWEntity`, `OBVEntity`, `StochRSIEntity`, `DepthEntity`, `InfoWindowEntity`
 - **지표 계산**: `DataUtil.calculate`가 MA/BOLL/SAR/KDJ/MACD/RSI/WR/거래량 MA 일괄 계산
+  - 추가 유틸: `calcMACDWithParams`(MACD 주기 커스텀), `calcRSIList`(다중 RSI), `calcOBV`(OBV/MA/EMA), `calcStochRSI`(K/D)
 - **포맷/보조**: `NumberUtil`(숫자 단위 축약/소수 자릿수), `date_format_util.dart`(시간 포맷), `extension/num_ext.dart`(널/제로 체크)
 
 ## 공개 API
@@ -230,6 +231,11 @@ class DepthChartDemo extends StatelessWidget {
 | indicatorSAR | `IndicatorSAR?` | SAR 색상 및 시작/최대 가속도(%) 파라미터 설정 |
 | indicatorAVL | `IndicatorAVL?` | AVL(캔들 평균가) 색상 설정 및 라벨 표시 |
 | indicatorVolMA | `List<IndicatorVolMA>?` | 거래량 MA 다중 주기/색상 설정(최대 10개) |
+| indicatorMACD | `MACDInputEntity?` | MACD 주기/표시/색상/히스토그램(양/음·증가/감소별) 스타일 |
+| indicatorRSI | `List<RSIInputEntity>?` | RSI 다중 라인(최대 3개), 각 주기/색상 지정 |
+| indicatorWR | `WRInputEntity?` | Williams %R 주기/색상 지정 |
+| indicatorOBV | `OBVInputEntity?` | OBV 본선 색상, MA/EMA 표시 토글 및 주기/색상 지정 |
+| indicatorStochRSI | `StochRSIInputEntity?` | StochRSI 길이/스무딩, K/D 표시 토글 및 색상 |
 | flingTime | `int` | 플링 애니메이션 지속(ms) |
 | flingRatio | `double` | 플링 속도 비율(관성 세기) |
 | flingCurve | `Curve` | 플링 커브(e.g. `Curves.decelerate`) |
@@ -413,3 +419,77 @@ KChartWidget(
 
 - 현재가 라벨 텍스트/테두리는 `nowPriceUpColor`로 그려지며, `nowPriceTextColor`는 현재 구현상 사용되지 않습니다.
 - EMA/AVL을 사용하려면 `mainStateLi`에 `MainState.EMA`, `MainState.AVL`을 추가하고, 필요 시 `indicatorEMA`, `indicatorAVL`로 색상/라벨을 지정하세요. `DataUtil.calcEMAList`를 사용하면 데이터에 EMA 값이 채워져 EMA 라인이 렌더링됩니다.
+
+## 보조지표 커스터마이즈 가이드
+
+### MACD
+
+- **입력 엔티티**: `MACDInputEntity`
+  - `shortPeriod`, `longPeriod`, `MAPeriod`
+  - `difShow`, `difColor`, `deaShow`, `deaColor`, `macdShow`
+  - 히스토그램 스타일/색상: `macdLongGrowType|Color`, `macdLongFallType|Color`, `macdShortGrowType|Color`, `macdShortFallType|Color` (증가/감소·양/음)
+- **히스토그램 폭**: 거래량 막대 폭(`chartStyle.volWidth`)과 동일
+- **라벨**: "DIF: {value}  DEA: {value}  MACD: {value}" (라벨 색상은 DIF 색 적용)
+- **계산**: `DataUtil.calcMACDWithParams(datas, shortPeriod: x, longPeriod: y, maPeriod: z)`
+
+### RSI (다중 라인)
+
+- **입력 엔티티**: `List<RSIInputEntity>` (최대 3개)
+  - 각 항목: `value`(기간), `color`
+- **라벨**: 각 라인별 "RSI({period}): {value}" (해당 색 적용)
+- **Y축 스케일**: 현재 보이는 구간의 RSI 값 최소/최대에 맞춰 동적 스케일
+- **계산**: `DataUtil.calcRSIList(datas, [7, 14, 28])`
+
+### Williams %R (WR)
+
+- **입력 엔티티**: `WRInputEntity(value, color)`
+- **라벨**: "Wm %R({period}): {value}"
+- **Y축 스케일**: 표준 범위 고정 [-100, 0]
+
+### OBV
+
+- **입력 엔티티**: `OBVInputEntity`
+  - 본선: `obvColor`
+  - MA: `obvMAShow`, `obvMAValue`, `obvMAColor`
+  - EMA: `obvEMAShow`, `obvEMAValue`, `obvEMAColor`
+- **라벨**: `OBV: {v}  MA({p}): {v}  EMA({p}): {v}` (MA/EMA는 각각 표시 토글에 따름)
+- **Y축 스케일**: 가시 구간의 OBV/MA/EMA 최소/최대 기반 동적 스케일(전 구간 음수일 때도 정상 동작)
+- **계산**: `DataUtil.calcOBV(datas, maPeriod: m, emaPeriod: e)`
+  - 단위: 각 분봉의 `vol / close`
+
+### StochRSI
+
+- **입력 엔티티**: `StochRSIInputEntity`
+  - `lengthRSI`, `lengthStoch`, `smoothK`, `smoothD`
+  - `stochRSIShow`, `stochRSIKColor`, `stochRSIDShow`, `stochRSIDColor`
+- **라벨**: `STOCHRSI: {K}`(K), `MASTOCHRSI: {D}`(D)
+- **Y축 스케일**: 가시 구간의 K/D 최소/최대 기반 동적 스케일(최소 높이 보장)
+- **계산**: `DataUtil.calcStochRSI(datas, lengthRSI: 14, lengthStoch: 14, smoothK: 3, smoothD: 3)`
+
+### 적용 방법 요약
+
+```dart
+KChartWidget(
+  datas,
+  chartStyle,
+  chartColors,
+  isTrendLine: false,
+  secondaryStateLi: {SecondaryState.MACD, SecondaryState.RSI, SecondaryState.OBV, SecondaryState.STOCHRSI},
+  indicatorMACD: macd,
+  indicatorRSI: [
+    RSIInputEntity(value: 7, color: Colors.cyan),
+    RSIInputEntity(value: 14, color: Colors.orange),
+  ],
+  indicatorWR: WRInputEntity(value: 14, color: Colors.purple),
+  indicatorOBV: OBVInputEntity(
+    obvColor: Colors.blue,
+    obvMAShow: true, obvMAValue: 10, obvMAColor: Colors.teal,
+    obvEMAShow: true, obvEMAValue: 10, obvEMAColor: Colors.red,
+  ),
+  indicatorStochRSI: StochRSIInputEntity(
+    lengthRSI: 14, lengthStoch: 14, smoothK: 3, smoothD: 3,
+    stochRSIShow: true, stochRSIKColor: Colors.cyan,
+    stochRSIDShow: true, stochRSIDColor: Colors.orange,
+  ),
+);
+```

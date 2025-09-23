@@ -324,7 +324,14 @@ abstract class BaseChartPainter extends CustomPainter {
         break;
       // RSI
       case SecondaryState.RSI:
-        if (item.rsi != null) {
+        if (item.rsiValueList != null && item.rsiValueList!.isNotEmpty) {
+          for (final v in item.rsiValueList!) {
+            mSecondaryRectList[index].mMaxValue =
+                max(mSecondaryRectList[index].mMaxValue, v);
+            mSecondaryRectList[index].mMinValue =
+                min(mSecondaryRectList[index].mMinValue, v);
+          }
+        } else if (item.rsi != null) {
           mSecondaryRectList[index].mMaxValue =
               max(mSecondaryRectList[index].mMaxValue, item.rsi!);
           mSecondaryRectList[index].mMinValue =
@@ -335,6 +342,63 @@ abstract class BaseChartPainter extends CustomPainter {
       case SecondaryState.WR:
         mSecondaryRectList[index].mMaxValue = 0;
         mSecondaryRectList[index].mMinValue = -100;
+        break;
+      // OBV
+      case SecondaryState.OBV:
+        // Initialize max/min with first meaningful value to support fully-negative series
+        if (mSecondaryRectList[index].mMaxValue == double.minPositive &&
+            mSecondaryRectList[index].mMinValue == double.maxFinite) {
+          final double seed = (item.obv ?? item.obvMA ?? item.obvEMA ?? 0.0);
+          mSecondaryRectList[index].mMaxValue = seed;
+          mSecondaryRectList[index].mMinValue = seed;
+        }
+        if (item.obv != null) {
+          mSecondaryRectList[index].mMaxValue =
+              max(mSecondaryRectList[index].mMaxValue, item.obv!);
+          mSecondaryRectList[index].mMinValue =
+              min(mSecondaryRectList[index].mMinValue, item.obv!);
+        }
+        if (item.obvMA != null) {
+          mSecondaryRectList[index].mMaxValue =
+              max(mSecondaryRectList[index].mMaxValue, item.obvMA!);
+          mSecondaryRectList[index].mMinValue =
+              min(mSecondaryRectList[index].mMinValue, item.obvMA!);
+        }
+        if (item.obvEMA != null) {
+          mSecondaryRectList[index].mMaxValue =
+              max(mSecondaryRectList[index].mMaxValue, item.obvEMA!);
+          mSecondaryRectList[index].mMinValue =
+              min(mSecondaryRectList[index].mMinValue, item.obvEMA!);
+        }
+        break;
+      // StochRSI: axis based on current visible values
+      case SecondaryState.STOCHRSI:
+        // Initialize with first meaningful value to avoid staying at sentinel extremes
+        if (mSecondaryRectList[index].mMaxValue == double.minPositive &&
+            mSecondaryRectList[index].mMinValue == double.maxFinite) {
+          final double seed = (item.stochK ?? item.stochD ?? 0.0);
+          mSecondaryRectList[index].mMaxValue = seed;
+          mSecondaryRectList[index].mMinValue = seed;
+        }
+        if (item.stochK != null) {
+          mSecondaryRectList[index].mMaxValue =
+              max(mSecondaryRectList[index].mMaxValue, item.stochK!);
+          mSecondaryRectList[index].mMinValue =
+              min(mSecondaryRectList[index].mMinValue, item.stochK!);
+        }
+        if (item.stochD != null) {
+          mSecondaryRectList[index].mMaxValue =
+              max(mSecondaryRectList[index].mMaxValue, item.stochD!);
+          mSecondaryRectList[index].mMinValue =
+              min(mSecondaryRectList[index].mMinValue, item.stochD!);
+        }
+        // avoid zero height axis when max == min
+        if (mSecondaryRectList[index].mMaxValue ==
+            mSecondaryRectList[index].mMinValue) {
+          final double v = mSecondaryRectList[index].mMaxValue;
+          mSecondaryRectList[index].mMaxValue = v + 1;
+          mSecondaryRectList[index].mMinValue = v - 1;
+        }
         break;
 
       // default:

@@ -95,6 +95,57 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
     IndicatorVolMA(10, Colors.blue),
   ];
 
+  final List<RSIInputEntity> _indicatorRSI = [
+    RSIInputEntity(value: 6, color: Colors.red),
+    RSIInputEntity(value: 12, color: Colors.blue),
+    RSIInputEntity(value: 24, color: Colors.green),
+  ];
+
+  final MACDInputEntity _indicatorMACD = MACDInputEntity(
+    shortPeriod: 12,
+    longPeriod: 26,
+    MAPeriod: 9,
+    difShow: true,
+    difColor: Colors.orange,
+    deaShow: true,
+    deaColor: Colors.purple,
+    macdShow: true,
+    macdLongGrowType: GrowFallType.hollow,
+    macdLongGrowColor: Colors.green,
+    macdLongFallType: GrowFallType.solid,
+    macdLongFallColor: Colors.green,
+    macdShortGrowType: GrowFallType.hollow,
+    macdShortGrowColor: Colors.red,
+    macdShortFallType: GrowFallType.solid,
+    macdShortFallColor: Colors.red,
+  );
+
+  final WRInputEntity _indicatorWR = WRInputEntity(
+    value: 14,
+    color: Colors.red,
+  );
+
+  final OBVInputEntity _indicatorOBV = OBVInputEntity(
+    obvColor: Colors.red,
+    obvMAShow: true,
+    obvMAValue: 7,
+    obvMAColor: Colors.blue,
+    obvEMAShow: true,
+    obvEMAValue: 7,
+    obvEMAColor: Colors.green,
+  );
+
+  final StochRSIInputEntity _indicatorStochRSI = StochRSIInputEntity(
+    lengthRSI: 14,
+    lengthStoch: 14,
+    smoothK: 3,
+    smoothD: 3,
+    stochRSIShow: true,
+    stochRSIKColor: Colors.orange,
+    stochRSIDShow: true,
+    stochRSIDColor: Colors.purple,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -163,6 +214,13 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
         _indicatorBOLL.bandwidth,
       );
       DataUtil.calcEMAList(datas!, _indicatorEMA.map((e) => e.value).toList());
+      // MACD 재계산(사용자 지정 파라미터)
+      DataUtil.calcMACDWithParams(
+        datas!,
+        shortPeriod: _indicatorMACD.shortPeriod,
+        longPeriod: _indicatorMACD.longPeriod,
+        maPeriod: _indicatorMACD.MAPeriod,
+      );
       DataUtil.calcSARWithParams(
         datas!,
         startPercent: _indicatorSAR.start,
@@ -172,6 +230,19 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
       DataUtil.calcVolumeMAList(
         datas!,
         _indicatorVolMA.map((e) => e.value).toList(),
+      );
+      DataUtil.calcRSIList(datas!, _indicatorRSI.map((e) => e.value).toList());
+      DataUtil.calcStochRSI(
+        datas!,
+        lengthRSI: _indicatorStochRSI.lengthRSI,
+        lengthStoch: _indicatorStochRSI.lengthStoch,
+        smoothK: _indicatorStochRSI.smoothK,
+        smoothD: _indicatorStochRSI.smoothD,
+      );
+      DataUtil.calcOBV(
+        datas!,
+        maPeriod: _indicatorOBV.obvMAValue,
+        emaPeriod: _indicatorOBV.obvEMAValue,
       );
       setState(() {});
     });
@@ -232,15 +303,30 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
       _indicatorBOLL.bandwidth,
     );
     DataUtil.calcEMAList(datas!, _indicatorEMA.map((e) => e.value).toList());
+    // MACD 초기 계산(사용자 지정 파라미터)
+    DataUtil.calcMACDWithParams(
+      datas!,
+      shortPeriod: _indicatorMACD.shortPeriod,
+      longPeriod: _indicatorMACD.longPeriod,
+      maPeriod: _indicatorMACD.MAPeriod,
+    );
     DataUtil.calcSARWithParams(
       datas!,
       startPercent: _indicatorSAR.start,
       stepPercent: _indicatorSAR.start,
       maxPercent: _indicatorSAR.maximum,
     );
+    // RSI 다중 계산(최대 3개)
+    DataUtil.calcRSIList(datas!, _indicatorRSI.map((e) => e.value).toList());
     DataUtil.calcVolumeMAList(
       datas!,
       _indicatorVolMA.map((e) => e.value).toList(),
+    );
+    // OBV 계산 (OBV, MA, EMA)
+    DataUtil.calcOBV(
+      datas!,
+      maPeriod: _indicatorOBV.obvMAValue,
+      emaPeriod: _indicatorOBV.obvEMAValue,
     );
     setState(() {});
   }
@@ -321,10 +407,15 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
                 },
                 indicatorMA: _indicatorMA,
                 indicatorEMA: _indicatorEMA,
+                indicatorRSI: _indicatorRSI,
+                indicatorWR: _indicatorWR,
                 indicatorBOLL: _indicatorBOLL,
                 indicatorSAR: _indicatorSAR,
                 indicatorAVL: _indicatorAVL,
                 indicatorVolMA: _indicatorVolMA,
+                indicatorMACD: _indicatorMACD,
+                indicatorOBV: _indicatorOBV,
+                indicatorStochRSI: _indicatorStochRSI,
               ),
               if (showLoading)
                 Container(
@@ -508,6 +599,13 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
     DataUtil.calcVolumeMAList(
       datas!,
       _indicatorVolMA.map((e) => e.value).toList(),
+    );
+    DataUtil.calcStochRSI(
+      datas!,
+      lengthRSI: _indicatorStochRSI.lengthRSI,
+      lengthStoch: _indicatorStochRSI.lengthStoch,
+      smoothK: _indicatorStochRSI.smoothK,
+      smoothD: _indicatorStochRSI.smoothD,
     );
     showLoading = false;
     setState(() {});

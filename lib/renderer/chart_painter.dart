@@ -17,6 +17,11 @@ import '../entity/sar_entity.dart';
 import '../utils/data_util.dart';
 import '../entity/avl_entity.dart';
 import '../entity/vol_ma_entity.dart';
+import '../entity/wr_entity.dart';
+import '../entity/rsi_entity.dart';
+import '../entity/macd_entity.dart';
+import '../entity/stoch_rsi_entity.dart';
+import '../entity/obv_entity.dart';
 
 class TrendLine {
   final Offset p1;
@@ -64,10 +69,15 @@ class ChartPainter extends BaseChartPainter {
   int? activePositionId;
   final List<IndicatorMA>? indicatorMA;
   final List<IndicatorEMA>? indicatorEMA;
+  final List<RSIInputEntity>? indicatorRSI;
+  final WRInputEntity? indicatorWR;
+  final OBVInputEntity? indicatorOBV;
+  final StochRSIInputEntity? indicatorStochRSI;
   final IndicatorBOLL? indicatorBOLL;
   final IndicatorSAR? indicatorSAR;
   final IndicatorAVL? indicatorAVL;
   final List<IndicatorVolMA>? indicatorVolMA;
+  final MACDInputEntity? indicatorMACD;
   Map<int, Rect> _hitLeftChip = {};
   Map<int, Rect> _hitBtnClose = {};
   Map<int, Rect> _hitBtnTp = {};
@@ -108,10 +118,15 @@ class ChartPainter extends BaseChartPainter {
     this.activePositionId,
     this.indicatorMA,
     this.indicatorEMA,
+    this.indicatorRSI,
+    this.indicatorWR,
+    this.indicatorOBV,
+    this.indicatorStochRSI,
     this.indicatorBOLL,
     this.indicatorSAR,
     this.indicatorAVL,
     this.indicatorVolMA,
+    this.indicatorMACD,
     mainStateLi,
     volHidden,
     secondaryStateLi,
@@ -208,6 +223,11 @@ class ChartPainter extends BaseChartPainter {
         fixedLength,
         chartStyle,
         chartColors,
+        indicatorMACD: indicatorMACD,
+        indicatorRSI: indicatorRSI,
+        indicatorWR: indicatorWR,
+        indicatorStochRSI: indicatorStochRSI,
+        indicatorOBV: indicatorOBV,
       ));
     }
   }
