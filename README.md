@@ -3,14 +3,14 @@
 ## 기능 개요
 
 - **차트 유형**: 캔들(봉), 라인 차트, 거래량(Vol), 보조지표 다중 표기, 호가 뎁스(Depth) 차트
-  - **메인 지표**: MA, BOLL, SAR
+  - **메인 지표**: MA, EMA, BOLL, SAR, AVL(평균가)
   - **보조 지표**: MACD, KDJ, RSI, WR, CCI (여러 개 동시 표시 지원)
 - **상호작용**: 드래그 스크롤, 핀치 줌, 플링(가속 스크롤), 롱프레스 십자선/데이터 조회, 탭 기반 정보 팝업, 추세선(TrendLine) 모드로 차트 상 라인 그리기, 우측 가격축 드래그로 수직 스케일 조정(기본 표시 범위보다 더 넓게만 확장; 축소는 제한)
 - **렌더링/성능**: 가시 구간만 계산/렌더, 이진 탐색 기반 인덱싱, 최대 스크롤 범위 관리, `onLoadMore(bool isLeft)` 콜백으로 양 끝 도달 시 추가 로딩 트리거
 - **표시 요소**: 현재가 점선/라벨, 구간 내 고가/저가 표기, 격자 표시 토글, 좌/우 수직축 정렬, 시간 표시 자동 포맷(주기 추론) 및 커스텀 포맷 지원
 - **스타일/테마**: `ChartColors`로 배경/텍스트/테두리/지표/깊이 등 세부 색상 제어, `ChartStyle`로 폭/패딩/두께/격자/현재가 라인 등 구성. 다크 모드 등 멀티 테마 적용 가능
 - **현지화**: `ChartTranslations`, `DepthChartTranslations`로 정보 창/깊이 차트 라벨 다국어 지원
-- **구성 옵션(주요)**: `isLine`, `volHidden`, `mainStateLi`, `secondaryStateLi`, `isTrendLine`, `xFrontPadding`, `isTapShowInfoDialog`, `showNowPrice`, `showInfoDialog`, `materialInfoDialog`, `timeFormat`, `fixedLength`, `maDayList`, `flingTime/flingRatio/flingCurve`, `verticalTextAlignment`, `nowPriceLabelAlignment`, `positionLabelAlignment`, `positionLines`, `markers`, `onPositionAction`
+- **구성 옵션(주요)**: `isLine`, `volHidden`, `mainStateLi`, `secondaryStateLi`, `isTrendLine`, `xFrontPadding`, `isTapShowInfoDialog`, `showNowPrice`, `showInfoDialog`, `materialInfoDialog`, `timeFormat`, `fixedLength`, `maDayList`, `flingTime/flingRatio/flingCurve`, `verticalTextAlignment`, `nowPriceLabelAlignment`, `positionLabelAlignment(예약)`, `positionLines`, `markers`, `onPositionAction`, `onEdgeLoadTs`
 - **구성 요소**: `KChartWidget`(메인 차트), `DepthChart`(호가뎁스), `PopupInfoView`(정보 팝업)
 
 ## 데이터/유틸
@@ -140,7 +140,8 @@ final darkColors = ChartColors(
   bgColor: const Color(0xFF0F1115),
   gridColor: const Color(0xFF2A2D34),
   defaultTextColor: const Color(0xFF9BA1A6),
-  nowPriceTextColor: const Color(0xFF0F1115),
+  // 현재가 라벨 텍스트/테두리/점선 컬러는 nowPriceUpColor가 사용됩니다
+  nowPriceUpColor: const Color(0xFF32D9F8),
   selectFillColor: const Color(0xFF1A1D23),
   selectBorderColor: const Color(0xFF3A3F47),
 );
@@ -223,6 +224,12 @@ class DepthChartDemo extends StatelessWidget {
 | onEdgeLoadTs | `void Function(bool isLeft, int ts)?` | 끝 도달 시 페이징 기준 타임스탬프 제공. `true`(좌측)=현재 마지막 봉 시간+1ms, `false`(우측)=현재 첫 봉 시간-1ms |
 | fixedLength | `int` | 가격/수치 소수 자릿수(기본 자동 유추, 수동 지정 가능) |
 | maDayList | `List<int>` | MA 계산 기간 목록(예: `[5,10,20]`) |
+| indicatorMA | `List<IndicatorMA>?` | MA 라벨/색상 커스터마이즈(최대 10개) |
+| indicatorEMA | `List<IndicatorEMA>?` | EMA 주기/색상 커스터마이즈(최대 10개) 및 EMA 라벨 표시 |
+| indicatorBOLL | `IndicatorBOLL?` | BOLL 주기/밴드폭/표시여부/색상 설정 |
+| indicatorSAR | `IndicatorSAR?` | SAR 색상 및 시작/최대 가속도(%) 파라미터 설정 |
+| indicatorAVL | `IndicatorAVL?` | AVL(캔들 평균가) 색상 설정 및 라벨 표시 |
+| indicatorVolMA | `List<IndicatorVolMA>?` | 거래량 MA 다중 주기/색상 설정(최대 10개) |
 | flingTime | `int` | 플링 애니메이션 지속(ms) |
 | flingRatio | `double` | 플링 속도 비율(관성 세기) |
 | flingCurve | `Curve` | 플링 커브(e.g. `Curves.decelerate`) |
@@ -233,7 +240,7 @@ class DepthChartDemo extends StatelessWidget {
 노트:
 
 - x축 시간 포맷 커스텀은 `chartStyle.dateTimeFormat`을 설정하세요. 설정하지 않으면 데이터 주기를 자동 추론하여 포맷을 선택합니다. 정보창의 시간은 `timeFormat`을 따릅니다.
- - 우측 가격축 드래그에 의한 수직 스케일은 현재 구현상 기본 표시 범위보다 더 넓게(줌 아웃) 확장만 허용됩니다. 기본 범위보다 더 좁게(줌 인) 축소하는 동작은 제한됩니다.
+- 우측 가격축 드래그에 의한 수직 스케일은 현재 구현상 기본 표시 범위보다 더 넓게(줌 아웃) 확장만 허용됩니다. 기본 범위보다 더 좁게(줌 인) 축소하는 동작은 제한됩니다.
 
 ### 스크롤/페이징 동작
 
@@ -284,7 +291,7 @@ KChartWidget에서 보유 포지션의 평단가를 수평 라인으로 표시�
 
 - 속성: `positionLines: List<PositionLineEntity>`
 - 항목: `id:int`(필수), `price`(필수), `isLong`(선택), `label`(선택), `color`(선택), `lineWidth`(선택)
-- 라벨 정렬: 가격 라벨은 `nowPriceLabelAlignment`, 포지션 좌측 칩은 `positionLabelAlignment` 규칙(`followVertical | left | right`)
+- 라벨 정렬: 가격 라벨은 `nowPriceLabelAlignment`로 제어됩니다. `positionLabelAlignment`는 현재 버전에서 예약 필드이며 렌더 정렬에는 아직 적용되지 않습니다.
 
 스타일(기본 구현)
 
@@ -401,3 +408,8 @@ KChartWidget(
   nowPriceLabelAlignment: NowPriceLabelAlignment.right,
 );
 ```
+
+참고:
+
+- 현재가 라벨 텍스트/테두리는 `nowPriceUpColor`로 그려지며, `nowPriceTextColor`는 현재 구현상 사용되지 않습니다.
+- EMA/AVL을 사용하려면 `mainStateLi`에 `MainState.EMA`, `MainState.AVL`을 추가하고, 필요 시 `indicatorEMA`, `indicatorAVL`로 색상/라벨을 지정하세요. `DataUtil.calcEMAList`를 사용하면 데이터에 EMA 값이 채워져 EMA 라인이 렌더링됩니다.
