@@ -245,8 +245,10 @@ abstract class BaseChartPainter extends CustomPainter {
         maxPrice = max(maxPrice, item.up ?? 0);
         minPrice = min(minPrice, item.dn ?? 0);
       } else if (mainStateLi.elementAt(i) == MainState.SAR) {
-        maxPrice = max(maxPrice, item.sar ?? 0);
-        minPrice = min(minPrice, item.sar ?? 0);
+        if (chartStyle.includeSarInScale) {
+          maxPrice = max(maxPrice, item.sar ?? 0);
+          minPrice = min(minPrice, item.sar ?? 0);
+        }
       }
     }
 

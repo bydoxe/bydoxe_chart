@@ -4,11 +4,8 @@ import 'package:bydoxe_chart/chart_translations.dart';
 import 'package:bydoxe_chart/components/popup_info_view.dart';
 import 'package:bydoxe_chart/k_chart_plus.dart';
 import 'renderer/base_dimension.dart';
-import 'renderer/main_renderer.dart'
-    show NowPriceLabelAlignment, VerticalTextAlignment, PositionLabelAlignment;
-import 'entity/position_line_entity.dart';
 
-enum MainState { MA, BOLL, SAR }
+enum MainState { MA, BOLL, SAR, EMA, AVL }
 
 enum SecondaryState { MACD, KDJ, RSI, WR, CCI }
 
@@ -70,6 +67,12 @@ class KChartWidget extends StatefulWidget {
   final List<PositionMarkerEntity> markers;
   final bool isTrendLine;
   final double xFrontPadding;
+  final List<IndicatorMA>? indicatorMA;
+  final List<IndicatorEMA>? indicatorEMA;
+  final IndicatorBOLL? indicatorBOLL;
+  final IndicatorSAR? indicatorSAR;
+  final IndicatorAVL? indicatorAVL;
+  final List<IndicatorVolMA>? indicatorVolMA; // up to 2
 
   KChartWidget(
     this.datas,
@@ -104,6 +107,12 @@ class KChartWidget extends StatefulWidget {
     this.onPositionAction,
     this.markers = const <PositionMarkerEntity>[],
     this.mBaseHeight = 360,
+    this.indicatorMA,
+    this.indicatorEMA,
+    this.indicatorBOLL,
+    this.indicatorSAR,
+    this.indicatorAVL,
+    this.indicatorVolMA,
   });
 
   @override
@@ -123,10 +132,10 @@ class _KChartWidgetState extends State<KChartWidget>
   //For TrendLine
   List<TrendLine> lines = [];
   int? activePositionId;
-  double? changeinXposition;
-  double? changeinYposition;
+  double? changeInXPosition;
+  double? changeInYPosition;
   double mSelectY = 0.0;
-  bool waitingForOtherPairofCords = false;
+  bool waitingForOtherPairOfCords = false;
   bool enableCordRecord = false;
 
   double getMinScrollX() {
@@ -197,6 +206,12 @@ class _KChartWidgetState extends State<KChartWidget>
       markers: widget.markers,
       activePositionId: activePositionId,
       priceScale: _priceScale,
+      indicatorMA: widget.indicatorMA,
+      indicatorEMA: widget.indicatorEMA,
+      indicatorBOLL: widget.indicatorBOLL,
+      indicatorSAR: widget.indicatorSAR,
+      indicatorAVL: widget.indicatorAVL,
+      indicatorVolMA: widget.indicatorVolMA,
     );
 
     return LayoutBuilder(
@@ -258,18 +273,18 @@ class _KChartWidgetState extends State<KChartWidget>
             if (widget.isTrendLine && !isLongPress && enableCordRecord) {
               enableCordRecord = false;
               Offset p1 = Offset(getTrendLineX(), mSelectY);
-              if (!waitingForOtherPairofCords) {
+              if (!waitingForOtherPairOfCords) {
                 lines.add(TrendLine(
                     p1, Offset(-1, -1), trendLineMax!, trendLineScale!));
               }
 
-              if (waitingForOtherPairofCords) {
+              if (waitingForOtherPairOfCords) {
                 var a = lines.last;
                 lines.removeLast();
                 lines.add(TrendLine(a.p1, p1, trendLineMax!, trendLineScale!));
-                waitingForOtherPairofCords = false;
+                waitingForOtherPairOfCords = false;
               } else {
-                waitingForOtherPairofCords = true;
+                waitingForOtherPairOfCords = true;
               }
               notifyChanged();
             }
@@ -313,15 +328,15 @@ class _KChartWidgetState extends State<KChartWidget>
               notifyChanged();
             }
             //For TrendLine
-            if (widget.isTrendLine && changeinXposition == null) {
-              mSelectX = changeinXposition = details.localPosition.dx;
-              mSelectY = changeinYposition = details.globalPosition.dy;
+            if (widget.isTrendLine && changeInXPosition == null) {
+              mSelectX = changeInXPosition = details.localPosition.dx;
+              mSelectY = changeInYPosition = details.globalPosition.dy;
               notifyChanged();
             }
             //For TrendLine
-            if (widget.isTrendLine && changeinXposition != null) {
-              changeinXposition = details.localPosition.dx;
-              changeinYposition = details.globalPosition.dy;
+            if (widget.isTrendLine && changeInXPosition != null) {
+              changeInXPosition = details.localPosition.dx;
+              changeInYPosition = details.globalPosition.dy;
               notifyChanged();
             }
           },
@@ -335,11 +350,11 @@ class _KChartWidgetState extends State<KChartWidget>
             }
             if (widget.isTrendLine) {
               mSelectX =
-                  mSelectX + (details.localPosition.dx - changeinXposition!);
-              changeinXposition = details.localPosition.dx;
+                  mSelectX + (details.localPosition.dx - changeInXPosition!);
+              changeInXPosition = details.localPosition.dx;
               mSelectY =
-                  mSelectY + (details.globalPosition.dy - changeinYposition!);
-              changeinYposition = details.globalPosition.dy;
+                  mSelectY + (details.globalPosition.dy - changeInYPosition!);
+              changeInYPosition = details.globalPosition.dy;
               notifyChanged();
             }
           },

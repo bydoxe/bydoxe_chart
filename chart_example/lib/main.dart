@@ -43,13 +43,57 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
   KLineEntity? _lastCandle;
   bool showLoading = true;
   bool _volHidden = false;
-  // final Set<SecondaryState> _secondaryStateLi = <SecondaryState>{};
   final List<MainState> _mainStateLi = [];
   final List<SecondaryState> _secondaryStateLi = [];
   List<DepthEntity>? _bids, _asks;
 
   ChartStyle chartStyle = ChartStyle();
   ChartColors chartColors = ChartColors(nowPriceUpColor: Colors.black);
+
+  final List<IndicatorMA> _indicatorMA = [
+    IndicatorMA(5, Colors.red),
+    IndicatorMA(10, Colors.blue),
+    IndicatorMA(20, Colors.green),
+    IndicatorMA(1, Colors.amber),
+    IndicatorMA(1, Colors.purple),
+    IndicatorMA(1, Colors.orange),
+    IndicatorMA(1, Colors.brown),
+    IndicatorMA(1, Colors.cyan),
+    IndicatorMA(1, Colors.deepPurple),
+    IndicatorMA(1, Colors.blueAccent),
+  ];
+
+  final List<IndicatorEMA> _indicatorEMA = [
+    IndicatorEMA(5, Colors.red),
+    IndicatorEMA(10, Colors.blue),
+    IndicatorEMA(20, Colors.green),
+    IndicatorEMA(1, Colors.amber),
+    IndicatorEMA(1, Colors.purple),
+    IndicatorEMA(1, Colors.orange),
+    IndicatorEMA(1, Colors.brown),
+    IndicatorEMA(1, Colors.cyan),
+    IndicatorEMA(1, Colors.deepPurple),
+    IndicatorEMA(1, Colors.blueAccent),
+  ];
+
+  final IndicatorBOLL _indicatorBOLL = IndicatorBOLL(
+    20,
+    2,
+    true,
+    true,
+    true,
+    Colors.red,
+    Colors.blue,
+    Colors.green,
+  );
+
+  final IndicatorSAR _indicatorSAR = IndicatorSAR(0.02, 0.2, Colors.red);
+  final IndicatorAVL _indicatorAVL = IndicatorAVL(Colors.red);
+
+  final List<IndicatorVolMA> _indicatorVolMA = [
+    IndicatorVolMA(5, Colors.red),
+    IndicatorVolMA(10, Colors.blue),
+  ];
 
   @override
   void initState() {
@@ -112,7 +156,23 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
       }
 
       // 지표 재계산 및 리빌드
-      DataUtil.calculate(datas!);
+      DataUtil.calculate(
+        datas!,
+        _indicatorMA.map((e) => e.value).take(10).toList(),
+        _indicatorBOLL.period,
+        _indicatorBOLL.bandwidth,
+      );
+      DataUtil.calcEMAList(datas!, _indicatorEMA.map((e) => e.value).toList());
+      DataUtil.calcSARWithParams(
+        datas!,
+        startPercent: _indicatorSAR.start,
+        stepPercent: _indicatorSAR.start,
+        maxPercent: _indicatorSAR.maximum,
+      );
+      DataUtil.calcVolumeMAList(
+        datas!,
+        _indicatorVolMA.map((e) => e.value).toList(),
+      );
       setState(() {});
     });
   }
@@ -165,7 +225,23 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
       datas = [...prepend, ...datas!];
     }
 
-    DataUtil.calculate(datas!);
+    DataUtil.calculate(
+      datas!,
+      _indicatorMA.map((e) => e.value).take(10).toList(),
+      _indicatorBOLL.period,
+      _indicatorBOLL.bandwidth,
+    );
+    DataUtil.calcEMAList(datas!, _indicatorEMA.map((e) => e.value).toList());
+    DataUtil.calcSARWithParams(
+      datas!,
+      startPercent: _indicatorSAR.start,
+      stepPercent: _indicatorSAR.start,
+      maxPercent: _indicatorSAR.maximum,
+    );
+    DataUtil.calcVolumeMAList(
+      datas!,
+      _indicatorVolMA.map((e) => e.value).toList(),
+    );
     setState(() {});
   }
 
@@ -223,7 +299,7 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
                 mainStateLi: _mainStateLi.toSet(),
                 volHidden: _volHidden,
                 secondaryStateLi: _secondaryStateLi.toSet(),
-                fixedLength: 2,
+                fixedLength: 1,
                 timeFormat: TimeFormat.YEAR_MONTH_DAY,
                 verticalTextAlignment: VerticalTextAlignment.right, // 가격 라벨 정렬
                 showNowPrice: true,
@@ -243,6 +319,12 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
                     loadMoreKlineData(ts);
                   }
                 },
+                indicatorMA: _indicatorMA,
+                indicatorEMA: _indicatorEMA,
+                indicatorBOLL: _indicatorBOLL,
+                indicatorSAR: _indicatorSAR,
+                indicatorAVL: _indicatorAVL,
+                indicatorVolMA: _indicatorVolMA,
               ),
               if (showLoading)
                 Container(
@@ -410,7 +492,23 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
     // 마지막 봉 저장
     _lastCandle = (datas != null && datas!.isNotEmpty) ? datas!.last : null;
 
-    DataUtil.calculate(datas!);
+    DataUtil.calculate(
+      datas!,
+      _indicatorMA.map((e) => e.value).take(10).toList(),
+      _indicatorBOLL.period,
+      _indicatorBOLL.bandwidth,
+    );
+    DataUtil.calcEMAList(datas!, _indicatorEMA.map((e) => e.value).toList());
+    DataUtil.calcSARWithParams(
+      datas!,
+      startPercent: _indicatorSAR.start,
+      stepPercent: _indicatorSAR.start,
+      maxPercent: _indicatorSAR.maximum,
+    );
+    DataUtil.calcVolumeMAList(
+      datas!,
+      _indicatorVolMA.map((e) => e.value).toList(),
+    );
     showLoading = false;
     setState(() {});
   }

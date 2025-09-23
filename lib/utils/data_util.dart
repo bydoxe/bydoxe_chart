@@ -19,6 +19,27 @@ class DataUtil {
     calcCCI(dataList);
   }
 
+  /// Calculate multiple EMA series and store in emaValueList (max 10 periods)
+  static void calcEMAList(List<KLineEntity> dataList, List<int> periods) {
+    if (dataList.isEmpty || periods.isEmpty) return;
+    final List<int> ps = periods.take(10).toList();
+    final List<double> lastEma = List<double>.filled(ps.length, 0.0);
+    for (int i = 0; i < dataList.length; i++) {
+      final KLineEntity e = dataList[i];
+      e.emaValueList = List<double>.filled(ps.length, 0.0);
+      for (int j = 0; j < ps.length; j++) {
+        final int p = ps[j] <= 1 ? 1 : ps[j];
+        final double alpha = 2.0 / (p + 1);
+        if (i == 0) {
+          lastEma[j] = e.close;
+        } else {
+          lastEma[j] = alpha * e.close + (1 - alpha) * lastEma[j];
+        }
+        e.emaValueList![j] = lastEma[j];
+      }
+    }
+  }
+
   static calcMA(List<KLineEntity> dataList, List<int> maDayList) {
     List<double> ma = List<double>.filled(maDayList.length, 0);
     if (dataList.isNotEmpty) {
@@ -98,6 +119,92 @@ class DataUtil {
       }
 
       dataList[i].sar = sar;
+    }
+  }
+
+  /// SAR calculation with configurable start/step/max (percent inputs)
+  /// startPercent, stepPercent, maxPercent are provided in percent units
+  /// (e.g., 2 => 0.02, 20 => 0.20)
+  static void calcSARWithParams(
+    List<KLineEntity> dataList, {
+    double startPercent = 2,
+    double stepPercent = 2,
+    double maxPercent = 20,
+  }) {
+    final double startAf = startPercent / 100.0;
+    final double step = stepPercent / 100.0;
+    final double maxAf = maxPercent / 100.0;
+    if (dataList.isEmpty) return;
+
+    // 1) 초기 추세 판단: 첫 2개의 종가/고저 비교
+    bool upTrend;
+    if (dataList.length >= 2) {
+      upTrend = dataList[1].close >= dataList[0].close;
+    } else {
+      upTrend = true;
+    }
+
+    // 2) 초기 SAR/EP 설정
+    double sar;
+    double ep; // extreme point
+    double af = startAf;
+    if (upTrend) {
+      sar = dataList[0].low; // 이전 최저가에서 시작
+      ep = max(
+          dataList[0].high, dataList[1 <= dataList.length - 1 ? 1 : 0].high);
+    } else {
+      sar = dataList[0].high; // 이전 최고가에서 시작
+      ep = min(dataList[0].low, dataList[1 <= dataList.length - 1 ? 1 : 0].low);
+    }
+    dataList[0].sar = sar;
+
+    for (int i = 1; i < dataList.length; i++) {
+      final cur = dataList[i];
+
+      // 3) 기본 업데이트
+      sar = sar + af * (ep - sar);
+
+      if (upTrend) {
+        // SAR는 이전 두 봉의 최저가보다 작거나 같아야 함
+        if (i >= 2) {
+          sar = min(sar, min(dataList[i - 1].low, dataList[i - 2].low));
+        } else {
+          sar = min(sar, dataList[i - 1].low);
+        }
+        // EP 갱신 및 AF 증가
+        if (cur.high > ep) {
+          ep = cur.high;
+          af = min(af + step, maxAf);
+        }
+        // 추세 전환 체크
+        if (cur.low < sar) {
+          // downtrend로 전환
+          upTrend = false;
+          sar = ep; // 전환 시 SAR = 직전 EP
+          ep = cur.low;
+          af = startAf;
+        }
+      } else {
+        // downtrend: SAR는 이전 두 봉의 최고가보다 크거나 같아야 함
+        if (i >= 2) {
+          sar = max(sar, max(dataList[i - 1].high, dataList[i - 2].high));
+        } else {
+          sar = max(sar, dataList[i - 1].high);
+        }
+        if (cur.low < ep) {
+          ep = cur.low;
+          af = min(af + step, maxAf);
+        }
+        if (cur.high > sar) {
+          // uptrend로 전환
+          upTrend = true;
+          sar = ep;
+          ep = cur.high;
+          af = startAf;
+        }
+      }
+
+      cur.sar = sar;
     }
   }
 
@@ -195,6 +302,29 @@ class DataUtil {
         entry.MA10Volume = volumeMa10 / 10;
       } else {
         entry.MA10Volume = 0;
+      }
+    }
+  }
+
+  /// Calculate multiple Volume MA series and store in volMaValueList (max 10 periods)
+  static void calcVolumeMAList(List<KLineEntity> dataList, List<int> periods) {
+    if (dataList.isEmpty || periods.isEmpty) return;
+    final List<int> ps = periods.take(10).toList();
+    final List<double> windows = List<double>.filled(ps.length, 0.0);
+    for (int i = 0; i < dataList.length; i++) {
+      final KLineEntity e = dataList[i];
+      e.volMaValueList = List<double>.filled(ps.length, 0.0);
+      for (int j = 0; j < ps.length; j++) {
+        final int p = ps[j] <= 1 ? 1 : ps[j];
+        windows[j] += e.vol;
+        if (i == p - 1) {
+          e.volMaValueList![j] = windows[j] / p;
+        } else if (i >= p) {
+          windows[j] -= dataList[i - p].vol;
+          e.volMaValueList![j] = windows[j] / p;
+        } else {
+          e.volMaValueList![j] = 0.0;
+        }
       }
     }
   }

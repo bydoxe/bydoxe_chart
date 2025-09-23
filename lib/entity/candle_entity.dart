@@ -6,6 +6,7 @@ mixin CandleEntity {
   late double close;
 
   List<double>? maValueList;
+  List<double>? emaValueList;
 
   // stopAndReverse
   double? sar;

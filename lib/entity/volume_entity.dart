@@ -5,4 +5,6 @@ mixin VolumeEntity {
   late double vol;
   double? MA5Volume;
   double? MA10Volume;
+  List<double>?
+      volMaValueList; // dynamic periods volume MAs (e.g., for 5/10 or custom)
 }

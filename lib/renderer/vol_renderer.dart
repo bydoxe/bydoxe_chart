@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:bydoxe_chart/k_chart_plus.dart';
+import '../entity/vol_ma_entity.dart';
 
 class VolRenderer extends BaseChartRenderer<VolumeEntity> {
   late double mVolWidth;
   final ChartStyle chartStyle;
   final ChartColors chartColors;
+  final List<IndicatorVolMA>? indicatorVolMA; // up to 2
 
   VolRenderer(Rect mainRect, double maxValue, double minValue,
-      double topPadding, int fixedLength, this.chartStyle, this.chartColors)
+      double topPadding, int fixedLength, this.chartStyle, this.chartColors,
+      {this.indicatorVolMA})
       : super(
           chartRect: mainRect,
           maxValue: maxValue,
@@ -34,14 +37,23 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
                 : this.chartColors.dnColor);
     }
 
-    if (lastPoint.MA5Volume != 0) {
-      drawLine(lastPoint.MA5Volume, curPoint.MA5Volume, canvas, lastX, curX,
-          this.chartColors.ma5Color);
-    }
-
-    if (lastPoint.MA10Volume != 0) {
-      drawLine(lastPoint.MA10Volume, curPoint.MA10Volume, canvas, lastX, curX,
-          this.chartColors.ma10Color);
+    // draw custom up to 2 MAs using volMaValueList and indicator colors
+    if (indicatorVolMA != null && indicatorVolMA!.isNotEmpty) {
+      final configs = indicatorVolMA!.take(2).toList();
+      final lastList = lastPoint.volMaValueList;
+      final curList = curPoint.volMaValueList;
+      if (lastList != null && curList != null) {
+        for (int idx = 0; idx < configs.length; idx++) {
+          if (idx < lastList.length && idx < curList.length) {
+            final double lastVal = lastList[idx];
+            final double curVal = curList[idx];
+            if (lastVal != 0 || curVal != 0) {
+              drawLine(
+                  lastVal, curVal, canvas, lastX, curX, configs[idx].color);
+            }
+          }
+        }
+      }
     }
   }
 
@@ -50,22 +62,29 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
 
   @override
   void drawText(Canvas canvas, VolumeEntity data, double x) {
-    TextSpan span = TextSpan(
-      children: [
-        TextSpan(
-            text: "VOL:${NumberUtil.format(data.vol)}    ",
-            style: getTextStyle(this.chartColors.volColor)),
-        if (data.MA5Volume.notNullOrZero)
-          TextSpan(
-              text: "MA5:${NumberUtil.format(data.MA5Volume!)}    ",
-              style: getTextStyle(this.chartColors.ma5Color)),
-        if (data.MA10Volume.notNullOrZero)
-          TextSpan(
-              text: "MA10:${NumberUtil.format(data.MA10Volume!)}    ",
-              style: getTextStyle(this.chartColors.ma10Color)),
-      ],
-    );
-    TextPainter tp = TextPainter(text: span, textDirection: TextDirection.ltr);
+    final List<InlineSpan> parts = [];
+    parts.add(TextSpan(
+        text: "VOL:${NumberUtil.format(data.vol)}    ",
+        style: getTextStyle(this.chartColors.nowPriceUpColor)));
+
+    // custom up to 2 MAs labels based on volMaValueList
+    if (indicatorVolMA != null && indicatorVolMA!.isNotEmpty) {
+      final configs = indicatorVolMA!.take(2).toList();
+      final list = data.volMaValueList;
+      for (int idx = 0; idx < configs.length; idx++) {
+        final int p = configs[idx].value;
+        String valueStr = '';
+        if (list != null && idx < list.length && list[idx] != 0) {
+          valueStr = NumberUtil.format(list[idx]);
+        }
+        parts.add(TextSpan(
+            text: "MA(${p}): ${valueStr}    ",
+            style: getTextStyle(configs[idx].color)));
+      }
+    }
+
+    TextPainter tp = TextPainter(
+        text: TextSpan(children: parts), textDirection: TextDirection.ltr);
     tp.layout();
     tp.paint(canvas, Offset(x, chartRect.top - topPadding));
   }

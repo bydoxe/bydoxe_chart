@@ -197,4 +197,8 @@ class ChartStyle {
 
   ///customize the time below
   List<String>? dateTimeFormat;
+
+  /// Whether SAR values should participate in main chart Y-scale computation
+  /// Default false to avoid compressing candles when SAR is far from OHLC
+  bool includeSarInScale = false;
 }

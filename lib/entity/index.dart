@@ -10,3 +10,8 @@ export 'rsi_entity.dart';
 export 'rw_entity.dart';
 export 'volume_entity.dart';
 export 'position_line_entity.dart';
+export 'ma_entity.dart';
+export 'boll_entity.dart';
+export 'sar_entity.dart';
+export 'avl_entity.dart';
+export 'vol_ma_entity.dart';

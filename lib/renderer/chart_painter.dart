@@ -11,6 +11,12 @@ import 'base_dimension.dart';
 import 'main_renderer.dart';
 import 'secondary_renderer.dart';
 import 'vol_renderer.dart';
+import '../entity/ma_entity.dart';
+import '../entity/boll_entity.dart';
+import '../entity/sar_entity.dart';
+import '../utils/data_util.dart';
+import '../entity/avl_entity.dart';
+import '../entity/vol_ma_entity.dart';
 
 class TrendLine {
   final Offset p1;
@@ -56,6 +62,12 @@ class ChartPainter extends BaseChartPainter {
   final PositionLabelAlignment positionLabelAlignment;
   final List<PositionMarkerEntity> markers;
   int? activePositionId;
+  final List<IndicatorMA>? indicatorMA;
+  final List<IndicatorEMA>? indicatorEMA;
+  final IndicatorBOLL? indicatorBOLL;
+  final IndicatorSAR? indicatorSAR;
+  final IndicatorAVL? indicatorAVL;
+  final List<IndicatorVolMA>? indicatorVolMA;
   Map<int, Rect> _hitLeftChip = {};
   Map<int, Rect> _hitBtnClose = {};
   Map<int, Rect> _hitBtnTp = {};
@@ -94,6 +106,12 @@ class ChartPainter extends BaseChartPainter {
     required this.positionLabelAlignment,
     required this.markers,
     this.activePositionId,
+    this.indicatorMA,
+    this.indicatorEMA,
+    this.indicatorBOLL,
+    this.indicatorSAR,
+    this.indicatorAVL,
+    this.indicatorVolMA,
     mainStateLi,
     volHidden,
     secondaryStateLi,
@@ -134,6 +152,22 @@ class ChartPainter extends BaseChartPainter {
   @override
   void initChartRenderer() {
     if (datas != null && datas!.isNotEmpty) {
+      // Recalculate SAR with indicator parameters if provided
+      if (indicatorSAR != null) {
+        double startP = indicatorSAR!.start;
+        double maxP = indicatorSAR!.maximum;
+        // If values look like AF (<=1.0), convert to percent units expected by calcSARWithParams
+        if (startP <= 1.0 && maxP <= 1.0) {
+          startP *= 100.0;
+          maxP *= 100.0;
+        }
+        DataUtil.calcSARWithParams(
+          datas!,
+          startPercent: startP,
+          stepPercent: startP,
+          maxPercent: maxP,
+        );
+      }
       var t = datas![0];
       fixedLength =
           NumberUtil.getMaxDecimalLength(t.open, t.close, t.high, t.low);
@@ -151,11 +185,17 @@ class ChartPainter extends BaseChartPainter {
       this.scaleX,
       verticalTextAlignment,
       priceScale,
-      maDayList,
+      maDayList: maDayList,
+      indicatorMA: indicatorMA,
+      indicatorEMA: indicatorEMA,
+      indicatorBOLL: indicatorBOLL,
+      indicatorSAR: indicatorSAR,
+      indicatorAVL: indicatorAVL,
     );
     if (mVolRect != null) {
       mVolRenderer = VolRenderer(mVolRect!, mVolMaxValue, mVolMinValue,
-          mChildPadding, fixedLength, this.chartStyle, this.chartColors);
+          mChildPadding, fixedLength, this.chartStyle, this.chartColors,
+          indicatorVolMA: indicatorVolMA);
     }
     mSecondaryRendererList.clear();
     for (int i = 0; i < mSecondaryRectList.length; ++i) {
