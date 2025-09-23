@@ -4,7 +4,7 @@
 
 - **차트 유형**: 캔들(봉), 라인 차트, 거래량(Vol), 보조지표 다중 표기, 호가 뎁스(Depth) 차트
   - **메인 지표**: MA, EMA, BOLL, SAR, AVL(평균가)
-  - **보조 지표**: MACD, KDJ, RSI, WR, CCI (여러 개 동시 표시 지원)
+  - **보조 지표**: MACD, KDJ, RSI, WR (여러 개 동시 표시 지원)
 - **상호작용**: 드래그 스크롤, 핀치 줌, 플링(가속 스크롤), 롱프레스 십자선/데이터 조회, 탭 기반 정보 팝업, 추세선(TrendLine) 모드로 차트 상 라인 그리기, 우측 가격축 드래그로 수직 스케일 조정(기본 표시 범위보다 더 넓게만 확장; 축소는 제한)
 - **렌더링/성능**: 가시 구간만 계산/렌더, 이진 탐색 기반 인덱싱, 최대 스크롤 범위 관리, `onLoadMore(bool isLeft)` 콜백으로 양 끝 도달 시 추가 로딩 트리거
 - **표시 요소**: 현재가 점선/라벨, 구간 내 고가/저가 표기, 격자 표시 토글, 좌/우 수직축 정렬, 시간 표시 자동 포맷(주기 추론) 및 커스텀 포맷 지원
@@ -15,8 +15,8 @@
 
 ## 데이터/유틸
 
-- **엔티티**: `KLineEntity`(open/high/low/close/vol/amount/time 등), `CandleEntity`, `VolumeEntity`, `MACDEntity`, `KDJEntity`, `RSIEntity`, `RWEntity`, `CCIEntity`, `DepthEntity`, `InfoWindowEntity`
-- **지표 계산**: `DataUtil.calculate`가 MA/BOLL/SAR/KDJ/MACD/RSI/WR/CCI/거래량 MA 일괄 계산
+- **엔티티**: `KLineEntity`(open/high/low/close/vol/amount/time 등), `CandleEntity`, `VolumeEntity`, `MACDEntity`, `KDJEntity`, `RSIEntity`, `RWEntity`, `DepthEntity`, `InfoWindowEntity`
+- **지표 계산**: `DataUtil.calculate`가 MA/BOLL/SAR/KDJ/MACD/RSI/WR/거래량 MA 일괄 계산
 - **포맷/보조**: `NumberUtil`(숫자 단위 축약/소수 자릿수), `date_format_util.dart`(시간 포맷), `extension/num_ext.dart`(널/제로 체크)
 
 ## 공개 API
@@ -27,7 +27,7 @@
 
 ## 사용 가능한 위젯
 
-- KChartWidget: 캔들/라인 메인 차트 + 거래량(Vol) + 보조지표(MACD/KDJ/RSI/WR/CCI) 다중 표시, 십자선/정보창, 줌/드래그/플링, 트렌드라인 모드, onLoadMore 지원
+- KChartWidget: 캔들/라인 메인 차트 + 거래량(Vol) + 보조지표(MACD/KDJ/RSI/WR) 다중 표시, 십자선/정보창, 줌/드래그/플링, 트렌드라인 모드, onLoadMore 지원
 - DepthChart: 호가 뎁스(매수/매도) 영역 차트, 롱프레스 시 가격/수량 팝업 표시
 
 참고: `PopupInfoView`는 내부 구성요소로 `KChartWidget`에서 사용됩니다. 직접 사용도 가능하지만 권장 공용 API는 `KChartWidget`, `DepthChart`입니다.
@@ -206,7 +206,7 @@ class DepthChartDemo extends StatelessWidget {
 | isTrendLine | `bool` | 트렌드라인 모드 활성화 여부(롱프레스 후 라인 기록/표시) |
 | xFrontPadding | `double` | 왼쪽 여백(스크롤 경계 계산에 반영) |
 | mainStateLi | `Set<MainState>` | 메인 지표 목록. `MA`, `BOLL`, `SAR` 중 다중 선택 가능 |
-| secondaryStateLi | `Set<SecondaryState>` | 보조 지표 목록. `MACD`, `KDJ`, `RSI`, `WR`, `CCI` 다중 선택 |
+| secondaryStateLi | `Set<SecondaryState>` | 보조 지표 목록. `MACD`, `KDJ`, `RSI`, `WR` 다중 선택 |
 | volHidden | `bool` | 거래량(Vol) 차트 숨김 여부 |
 | isLine | `bool` | 메인 차트를 라인 모드로 표시(기본은 캔들) |
 | isTapShowInfoDialog | `bool` | 탭으로 정보창 표시 활성화(롱프레스 십자선과 병행) |

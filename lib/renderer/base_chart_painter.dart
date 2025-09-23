@@ -336,15 +336,7 @@ abstract class BaseChartPainter extends CustomPainter {
         mSecondaryRectList[index].mMaxValue = 0;
         mSecondaryRectList[index].mMinValue = -100;
         break;
-      // CCI
-      case SecondaryState.CCI:
-        if (item.cci != null) {
-          mSecondaryRectList[index].mMaxValue =
-              max(mSecondaryRectList[index].mMaxValue, item.cci!);
-          mSecondaryRectList[index].mMinValue =
-              min(mSecondaryRectList[index].mMinValue, item.cci!);
-        }
-        break;
+
       // default:
       //   mSecondaryRectList[index].mMaxValue = 0;
       //   mSecondaryRectList[index].mMinValue = 0;

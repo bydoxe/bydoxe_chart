@@ -52,10 +52,6 @@ class SecondaryRenderer extends BaseChartRenderer<MACDEntity> {
         drawLine(lastPoint.r, curPoint.r, canvas, lastX, curX,
             this.chartColors.rsiColor);
         break;
-      case SecondaryState.CCI:
-        drawLine(lastPoint.cci, curPoint.cci, canvas, lastX, curX,
-            this.chartColors.rsiColor);
-        break;
     }
   }
 
@@ -135,13 +131,6 @@ class SecondaryRenderer extends BaseChartRenderer<MACDEntity> {
         children = [
           TextSpan(
               text: "WR(14):${format(data.r)}    ",
-              style: getTextStyle(this.chartColors.rsiColor)),
-        ];
-        break;
-      case SecondaryState.CCI:
-        children = [
-          TextSpan(
-              text: "CCI(14):${format(data.cci)}    ",
               style: getTextStyle(this.chartColors.rsiColor)),
         ];
         break;

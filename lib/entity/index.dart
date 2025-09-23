@@ -1,5 +1,4 @@
 export 'candle_entity.dart';
-export 'cci_entity.dart';
 export 'depth_entity.dart';
 export 'info_window_entity.dart';
 export 'kdj_entity.dart';

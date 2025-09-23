@@ -7,7 +7,7 @@ import 'renderer/base_dimension.dart';
 
 enum MainState { MA, BOLL, SAR, EMA, AVL }
 
-enum SecondaryState { MACD, KDJ, RSI, WR, CCI }
+enum SecondaryState { MACD, KDJ, RSI, WR }
 
 class TimeFormat {
   static const List<String> YEAR_MONTH_DAY = [yyyy, '-', mm, '-', dd];
