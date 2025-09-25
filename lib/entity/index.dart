@@ -16,4 +16,3 @@ export 'avl_entity.dart';
 export 'vol_ma_entity.dart';
 export 'obv_entity.dart';
 export 'stoch_rsi_entity.dart';
-export 'stoch_rsi_entity.dart';
