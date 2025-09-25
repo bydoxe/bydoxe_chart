@@ -22,6 +22,7 @@ import '../entity/rsi_entity.dart';
 import '../entity/macd_entity.dart';
 import '../entity/stoch_rsi_entity.dart';
 import '../entity/obv_entity.dart';
+import '../entity/kdj_entity.dart';
 
 class TrendLine {
   final Offset p1;
@@ -78,6 +79,7 @@ class ChartPainter extends BaseChartPainter {
   final IndicatorAVL? indicatorAVL;
   final List<IndicatorVolMA>? indicatorVolMA;
   final MACDInputEntity? indicatorMACD;
+  final KDJInputEntity? indicatorKDJ;
   Map<int, Rect> _hitLeftChip = {};
   Map<int, Rect> _hitBtnClose = {};
   Map<int, Rect> _hitBtnTp = {};
@@ -127,6 +129,7 @@ class ChartPainter extends BaseChartPainter {
     this.indicatorAVL,
     this.indicatorVolMA,
     this.indicatorMACD,
+    this.indicatorKDJ,
     mainStateLi,
     volHidden,
     secondaryStateLi,
@@ -228,6 +231,7 @@ class ChartPainter extends BaseChartPainter {
         indicatorWR: indicatorWR,
         indicatorStochRSI: indicatorStochRSI,
         indicatorOBV: indicatorOBV,
+        indicatorKDJ: indicatorKDJ,
       ));
     }
   }

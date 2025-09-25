@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../entity/macd_entity.dart';
 import '../k_chart_widget.dart' show SecondaryState;
 import '../entity/rsi_entity.dart';
+import '../entity/kdj_entity.dart';
 import '../entity/obv_entity.dart';
 import '../entity/stoch_rsi_entity.dart';
 import '../entity/wr_entity.dart';
@@ -17,6 +18,7 @@ class SecondaryRenderer extends BaseChartRenderer<MACDEntity> {
   final WRInputEntity? indicatorWR;
   final OBVInputEntity? indicatorOBV;
   final StochRSIInputEntity? indicatorStochRSI;
+  final KDJInputEntity? indicatorKDJ;
 
   SecondaryRenderer(
       Rect mainRect,
@@ -31,7 +33,8 @@ class SecondaryRenderer extends BaseChartRenderer<MACDEntity> {
       this.indicatorRSI,
       this.indicatorWR,
       this.indicatorOBV,
-      this.indicatorStochRSI})
+      this.indicatorStochRSI,
+      this.indicatorKDJ})
       : super(
           chartRect: mainRect,
           maxValue: maxValue,
@@ -52,12 +55,21 @@ class SecondaryRenderer extends BaseChartRenderer<MACDEntity> {
         drawMACD(curPoint, canvas, curX, lastPoint, lastX);
         break;
       case SecondaryState.KDJ:
-        drawLine(lastPoint.k, curPoint.k, canvas, lastX, curX,
-            this.chartColors.kColor);
-        drawLine(lastPoint.d, curPoint.d, canvas, lastX, curX,
-            this.chartColors.dColor);
-        drawLine(lastPoint.j, curPoint.j, canvas, lastX, curX,
-            this.chartColors.jColor);
+        final bool showK = indicatorKDJ?.showK ?? true;
+        final bool showD = indicatorKDJ?.showD ?? true;
+        final bool showJ = indicatorKDJ?.showJ ?? true;
+        final Color kColor = indicatorKDJ?.kColor ?? this.chartColors.kColor;
+        final Color dColor = indicatorKDJ?.dColor ?? this.chartColors.dColor;
+        final Color jColor = indicatorKDJ?.jColor ?? this.chartColors.jColor;
+        if (showK) {
+          _drawLineValue(lastPoint.k, curPoint.k, canvas, lastX, curX, kColor);
+        }
+        if (showD) {
+          _drawLineValue(lastPoint.d, curPoint.d, canvas, lastX, curX, dColor);
+        }
+        if (showJ) {
+          _drawLineValue(lastPoint.j, curPoint.j, canvas, lastX, curX, jColor);
+        }
         break;
       case SecondaryState.RSI:
         _drawRSILines(lastPoint, curPoint, canvas, lastX, curX);
@@ -227,22 +239,22 @@ class SecondaryRenderer extends BaseChartRenderer<MACDEntity> {
         ];
         break;
       case SecondaryState.KDJ:
+        final bool showK = indicatorKDJ?.showK ?? true;
+        final bool showD = indicatorKDJ?.showD ?? true;
+        final bool showJ = indicatorKDJ?.showJ ?? true;
+        final Color kColor = indicatorKDJ?.kColor ?? this.chartColors.kColor;
+        final Color dColor = indicatorKDJ?.dColor ?? this.chartColors.dColor;
+        final Color jColor = indicatorKDJ?.jColor ?? this.chartColors.jColor;
         children = [
-          TextSpan(
-              text: "KDJ(9,1,3)    ",
-              style: getTextStyle(this.chartColors.defaultTextColor)),
-          if (data.macd != 0)
+          if (showK && data.k != null)
             TextSpan(
-                text: "K:${format(data.k)}    ",
-                style: getTextStyle(this.chartColors.kColor)),
-          if (data.dif != 0)
+                text: "K:${format(data.k)}    ", style: getTextStyle(kColor)),
+          if (showD && data.d != null)
             TextSpan(
-                text: "D:${format(data.d)}    ",
-                style: getTextStyle(this.chartColors.dColor)),
-          if (data.dea != 0)
+                text: "D:${format(data.d)}    ", style: getTextStyle(dColor)),
+          if (showJ && data.j != null)
             TextSpan(
-                text: "J:${format(data.j)}    ",
-                style: getTextStyle(this.chartColors.jColor)),
+                text: "J:${format(data.j)}    ", style: getTextStyle(jColor)),
         ];
         break;
       case SecondaryState.RSI:

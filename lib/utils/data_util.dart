@@ -577,6 +577,53 @@ class DataUtil {
     }
   }
 
+  /// KDJ calculation with configurable window and smoothing periods
+  /// period: lookback window for RSV (typically 9)
+  /// m1: smoothing for K (typically 3)
+  /// m2: smoothing for D (typically 3)
+  static void calcKDJWithParams(
+    List<KLineEntity> dataList, {
+    int period = 9,
+    int m1 = 3,
+    int m2 = 3,
+  }) {
+    if (dataList.isEmpty) return;
+    final int n = period <= 1 ? 1 : period;
+    final int s1 = m1 <= 1 ? 1 : m1;
+    final int s2 = m2 <= 1 ? 1 : m2;
+
+    double prevK = 50.0;
+    double prevD = 50.0;
+    // seed first
+    dataList[0].k = prevK;
+    dataList[0].d = prevD;
+    dataList[0].j = 50.0;
+
+    for (int i = 1; i < dataList.length; i++) {
+      final int start = math.max(0, i - n + 1);
+      double low = double.maxFinite;
+      double high = -double.maxFinite;
+      for (int j = start; j <= i; j++) {
+        final e = dataList[j];
+        if (e.low < low) low = e.low;
+        if (e.high > high) high = e.high;
+      }
+      final double denom = (high - low).abs();
+      double rsv =
+          denom == 0 ? 0.0 : ((dataList[i].close - low) / denom) * 100.0;
+      // K = SMA(RSV, m1) => (m1-1)/m1 * prevK + 1/m1 * RSV
+      final double k = ((s1 - 1) * prevK + rsv) / s1;
+      // D = SMA(K, m2)
+      final double d = ((s2 - 1) * prevD + k) / s2;
+      final double j = 3 * k - 2 * d;
+      prevK = k;
+      prevD = d;
+      dataList[i].k = k;
+      dataList[i].d = d;
+      dataList[i].j = j;
+    }
+  }
+
   static void calcWR(List<KLineEntity> dataList) {
     double r;
     for (int i = 0; i < dataList.length; i++) {

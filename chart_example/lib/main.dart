@@ -146,6 +146,18 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
     stochRSIDColor: Colors.purple,
   );
 
+  final KDJInputEntity _indicatorKDJ = KDJInputEntity(
+    calculatePeriod: 9,
+    maPeriod_1: 3,
+    maPeriod_2: 3,
+    showK: true,
+    showD: true,
+    showJ: true,
+    kColor: Colors.red,
+    dColor: Colors.blue,
+    jColor: Colors.green,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -232,6 +244,13 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
         _indicatorVolMA.map((e) => e.value).toList(),
       );
       DataUtil.calcRSIList(datas!, _indicatorRSI.map((e) => e.value).toList());
+      // KDJ 재계산(사용자 지정 파라미터)
+      DataUtil.calcKDJWithParams(
+        datas!,
+        period: _indicatorKDJ.calculatePeriod,
+        m1: _indicatorKDJ.maPeriod_1,
+        m2: _indicatorKDJ.maPeriod_2,
+      );
       DataUtil.calcStochRSI(
         datas!,
         lengthRSI: _indicatorStochRSI.lengthRSI,
@@ -318,6 +337,13 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
     );
     // RSI 다중 계산(최대 3개)
     DataUtil.calcRSIList(datas!, _indicatorRSI.map((e) => e.value).toList());
+    // KDJ 초기 계산(사용자 지정 파라미터)
+    DataUtil.calcKDJWithParams(
+      datas!,
+      period: _indicatorKDJ.calculatePeriod,
+      m1: _indicatorKDJ.maPeriod_1,
+      m2: _indicatorKDJ.maPeriod_2,
+    );
     DataUtil.calcVolumeMAList(
       datas!,
       _indicatorVolMA.map((e) => e.value).toList(),
@@ -416,6 +442,7 @@ class _ChartExamplePageState extends State<ChartExamplePage> {
                 indicatorMACD: _indicatorMACD,
                 indicatorOBV: _indicatorOBV,
                 indicatorStochRSI: _indicatorStochRSI,
+                indicatorKDJ: _indicatorKDJ,
               ),
               if (showLoading)
                 Container(

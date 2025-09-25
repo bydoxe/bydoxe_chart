@@ -78,6 +78,7 @@ class KChartWidget extends StatefulWidget {
   final WRInputEntity? indicatorWR;
   final OBVInputEntity? indicatorOBV;
   final StochRSIInputEntity? indicatorStochRSI;
+  final KDJInputEntity? indicatorKDJ;
 
   KChartWidget(
     this.datas,
@@ -123,6 +124,7 @@ class KChartWidget extends StatefulWidget {
     this.indicatorWR,
     this.indicatorOBV,
     this.indicatorStochRSI,
+    this.indicatorKDJ,
   });
 
   @override
@@ -227,6 +229,7 @@ class _KChartWidgetState extends State<KChartWidget>
       indicatorWR: widget.indicatorWR,
       indicatorOBV: widget.indicatorOBV,
       indicatorStochRSI: widget.indicatorStochRSI,
+      indicatorKDJ: widget.indicatorKDJ,
     );
 
     return LayoutBuilder(
