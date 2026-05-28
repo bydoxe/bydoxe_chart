@@ -1,5 +1,5 @@
 import 'dart:async' show StreamSink;
-import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:bydoxe_chart/utils/number_util.dart';
 import '../entity/info_window_entity.dart';
@@ -62,6 +62,7 @@ class ChartPainter extends BaseChartPainter {
   final ChartStyle chartStyle;
   final bool hideGrid;
   final bool showNowPrice;
+  final ui.Image? candlePaneLogo;
   final MainAxisRange? mainAxisRangeOverride;
   final VerticalTextAlignment verticalTextAlignment;
   final NowPriceLabelAlignment nowPriceLabelAlignment;
@@ -138,6 +139,7 @@ class ChartPainter extends BaseChartPainter {
     bool isLine = false,
     this.hideGrid = false,
     this.showNowPrice = true,
+    this.candlePaneLogo,
     this.fixedLength = 2,
     this.maDayList = const [5, 10, 20],
     this.mainAxisRangeOverride,
@@ -265,105 +267,35 @@ class ChartPainter extends BaseChartPainter {
   }
 
   void _drawCandlePaneWatermark(Canvas canvas) {
-    if (mMainRect.width <= 0 || mMainRect.height <= 0) return;
+    final image = candlePaneLogo;
+    if (image == null || mMainRect.width <= 0 || mMainRect.height <= 0) return;
 
     final double targetWidth = mMainRect.width * 0.50;
     if (targetWidth < 80) return;
 
     final bool isLightBackground = chartColors.bgColor.computeLuminance() > 0.5;
-    final Color watermarkColor =
-        (isLightBackground ? Colors.black : Colors.white)
-            .withValues(alpha: isLightBackground ? 0.20 : 0.10);
-
-    double fontSize = 48.0;
-
-    TextPainter textPainter = _createWatermarkTextPainter(
-      fontSize: fontSize,
-      color: watermarkColor,
+    final double targetHeight = targetWidth * image.height / image.width;
+    final Rect sourceRect = Rect.fromLTWH(
+      0,
+      0,
+      image.width.toDouble(),
+      image.height.toDouble(),
     );
-
-    double markSize = textPainter.height * 0.96;
-    double gap = markSize * 0.55;
-    double groupWidth = markSize + gap + textPainter.width;
-    double groupHeight = math.max(markSize, textPainter.height);
-
-    fontSize *= targetWidth / groupWidth;
-    fontSize = math.max(12.0, fontSize);
-    textPainter = _createWatermarkTextPainter(
-      fontSize: fontSize,
-      color: watermarkColor,
+    final Rect targetRect = Rect.fromLTWH(
+      mMainRect.left + (mMainRect.width - targetWidth) / 2,
+      mMainRect.top + (mMainRect.height - targetHeight) / 2,
+      targetWidth,
+      targetHeight,
     );
-    markSize = textPainter.height * 0.96;
-    gap = markSize * 0.55;
-    groupWidth = markSize + gap + textPainter.width;
-    groupHeight = math.max(markSize, textPainter.height);
-
-    final double left = mMainRect.left + (mMainRect.width - groupWidth) / 2;
-    final double top = mMainRect.top + (mMainRect.height - groupHeight) / 2;
+    final Paint paint = Paint()
+      ..isAntiAlias = true
+      ..filterQuality = FilterQuality.high
+      ..color = Colors.white.withValues(alpha: isLightBackground ? 0.24 : 0.10);
 
     canvas.save();
     canvas.clipRect(mMainRect);
-    _drawWatermarkMark(
-      canvas,
-      Rect.fromLTWH(
-          left, top + (groupHeight - markSize) / 2, markSize, markSize),
-      watermarkColor,
-    );
-    textPainter.paint(
-      canvas,
-      Offset(
-        left + markSize + gap,
-        top + (groupHeight - textPainter.height) / 2,
-      ),
-    );
+    canvas.drawImageRect(image, sourceRect, targetRect, paint);
     canvas.restore();
-  }
-
-  TextPainter _createWatermarkTextPainter({
-    required double fontSize,
-    required Color color,
-  }) {
-    final TextPainter painter = TextPainter(
-      text: TextSpan(
-        text: 'BYDOXE',
-        style: TextStyle(
-          color: color,
-          fontSize: fontSize,
-          fontWeight: FontWeight.w800,
-          height: 1.0,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-      maxLines: 1,
-    );
-    painter.layout();
-    return painter;
-  }
-
-  void _drawWatermarkMark(Canvas canvas, Rect rect, Color color) {
-    final Paint paint = Paint()
-      ..isAntiAlias = true
-      ..style = PaintingStyle.fill
-      ..color = color;
-
-    final double unit = rect.width / 4;
-    canvas.drawRect(
-      Rect.fromLTWH(rect.left, rect.top, unit, rect.height),
-      paint,
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(rect.left + unit, rect.top + unit, unit * 2, unit),
-      paint,
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(
-          rect.left + unit * 0.35, rect.top + unit * 2, unit * 1.65, unit),
-      paint,
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(rect.left + unit, rect.top + unit * 3, unit * 2, unit),
-      paint,
-    );
   }
 
   @override

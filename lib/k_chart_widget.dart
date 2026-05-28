@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:bydoxe_chart/chart_translations.dart';
 import 'package:bydoxe_chart/components/popup_info_view.dart';
 import 'package:bydoxe_chart/k_chart_plus.dart';
@@ -139,6 +142,8 @@ class _KChartWidgetState extends State<KChartWidget>
   static const double _minScaleX = 0.5;
   static const double _autoScaleMaxScaleX = 2.2;
   static const double _manualAxisMaxScaleX = 5.0;
+  static const String _candlePaneLogoAsset =
+      'packages/bydoxe_chart/assets/candle_pane_logo.png';
 
   final StreamController<InfoWindowEntity?> mInfoWindowStream =
       StreamController<InfoWindowEntity?>();
@@ -163,6 +168,7 @@ class _KChartWidgetState extends State<KChartWidget>
   double _manualPinchStartScaleX = _defaultScaleX;
   double _manualPinchStartScrollX = 0.0;
   MainAxisRange? _manualPinchStartRange;
+  ui.Image? _candlePaneLogo;
   AnimationController? _controller;
   Animation<double>? aniX;
 
@@ -184,6 +190,7 @@ class _KChartWidgetState extends State<KChartWidget>
   @override
   void initState() {
     super.initState();
+    _loadCandlePaneLogo();
   }
 
   @override
@@ -196,7 +203,28 @@ class _KChartWidgetState extends State<KChartWidget>
     mInfoWindowStream.sink.close();
     mInfoWindowStream.close();
     _controller?.dispose();
+    _candlePaneLogo?.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadCandlePaneLogo() async {
+    final data = await rootBundle.load(_candlePaneLogoAsset);
+    final bytes = Uint8List.view(
+      data.buffer,
+      data.offsetInBytes,
+      data.lengthInBytes,
+    );
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    codec.dispose();
+    if (!mounted) {
+      frame.image.dispose();
+      return;
+    }
+    setState(() {
+      _candlePaneLogo?.dispose();
+      _candlePaneLogo = frame.image;
+    });
   }
 
   @override
@@ -247,6 +275,7 @@ class _KChartWidgetState extends State<KChartWidget>
       isLine: widget.isLine,
       hideGrid: widget.hideGrid,
       showNowPrice: widget.showNowPrice,
+      candlePaneLogo: _candlePaneLogo,
       fixedLength: widget.fixedLength,
       maDayList: widget.maDayList,
       verticalTextAlignment: widget.verticalTextAlignment,

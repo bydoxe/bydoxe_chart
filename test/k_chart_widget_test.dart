@@ -11,6 +11,20 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('loads the bundled candle pane logo asset', (tester) async {
+    await _pumpChart(tester);
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump();
+
+    final logo = _currentChartPainter(tester).candlePaneLogo;
+    expect(logo, isNotNull);
+    expect(logo!.width, 2815);
+    expect(logo.height, 609);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('pans the main axis after auto scale is disabled',
       (tester) async {
     await _pumpChart(tester);

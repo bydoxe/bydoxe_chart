@@ -16,3 +16,5 @@ dev_dependencies:
     sdk: flutter
 
 flutter:
+  assets:
+    - assets/candle_pane_logo.png
