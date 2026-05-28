@@ -283,9 +283,9 @@ class ChartPainter extends BaseChartPainter {
         double lastX = i == 0 ? curX : getX(i - 1);
 
         mMainRenderer.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
-        _drawMarkerForCandle(canvas, curX, i, curPoint);
       }
     });
+    _drawMarkers(canvas);
 
     final volRenderer = mVolRenderer;
     final volRect = mVolRect;
@@ -325,6 +325,19 @@ class ChartPainter extends BaseChartPainter {
       drawCrossLine(canvas, size);
     }
     if (isTrendLine == true) drawTrendLines(canvas, size);
+    canvas.restore();
+  }
+
+  void _drawMarkers(Canvas canvas) {
+    if (markers.isEmpty) return;
+    canvas.save();
+    canvas.clipRect(mMainRect);
+    for (int i = mStartIndex; datas != null && i <= mStopIndex; i++) {
+      final KLineEntity? curPoint = datas?[i];
+      if (curPoint == null) continue;
+      final double curX = translateXtoX(getX(i));
+      _drawMarkerForCandle(canvas, curX, i, curPoint);
+    }
     canvas.restore();
   }
 

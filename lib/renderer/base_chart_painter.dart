@@ -139,8 +139,11 @@ abstract class BaseChartPainter extends CustomPainter {
       drawDate(canvas, size);
 
       drawText(canvas, datas!.last, 5);
+      canvas.save();
+      canvas.clipRect(mMainRect);
       drawMaxAndMin(canvas);
       drawNowPrice(canvas);
+      canvas.restore();
       // draw extra overlays (e.g., position lines) after now price label
       drawOverlays(canvas, size);
 

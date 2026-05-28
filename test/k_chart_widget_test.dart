@@ -192,6 +192,44 @@ void main() {
     expect(afterDataX, closeTo(beforeDataX, 0.001));
     expect(afterAnchorValue, closeTo(beforeAnchorValue, 0.001));
   });
+
+  testWidgets('renders trade markers while zoomed without scaling errors',
+      (tester) async {
+    await _pumpChart(
+      tester,
+      dataCount: 80,
+      markers: const [
+        PositionMarkerEntity(
+          id: 1,
+          time: 1000 + 78 * 60000,
+          type: MarkerType.buy,
+          color: Color(0xff123456),
+        ),
+      ],
+    );
+
+    final chartGesture = _chartScaleGesture(tester);
+    chartGesture.onScaleStart!(
+      ScaleStartDetails(
+        focalPoint: const Offset(160, 200),
+        localFocalPoint: const Offset(160, 200),
+        pointerCount: 2,
+      ),
+    );
+    chartGesture.onScaleUpdate!(
+      ScaleUpdateDetails(
+        focalPoint: const Offset(160, 200),
+        localFocalPoint: const Offset(160, 200),
+        scale: 2,
+        pointerCount: 2,
+      ),
+    );
+    chartGesture.onScaleEnd!(ScaleEndDetails());
+    await tester.pump();
+
+    expect(_currentScaleX(tester), 2.0);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _pumpChart(
@@ -199,6 +237,7 @@ Future<void> _pumpChart(
   VerticalTextAlignment verticalTextAlignment = VerticalTextAlignment.left,
   ChartColors? chartColors,
   int dataCount = 8,
+  List<PositionMarkerEntity> markers = const <PositionMarkerEntity>[],
 }) async {
   final data = List<KLineEntity>.generate(
     dataCount,
@@ -224,6 +263,7 @@ Future<void> _pumpChart(
           chartColors ?? ChartColors(),
           mainStateLi: const {MainState.MA},
           verticalTextAlignment: verticalTextAlignment,
+          markers: markers,
           isTrendLine: false,
         ),
       ),
