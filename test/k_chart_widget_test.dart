@@ -230,6 +230,81 @@ void main() {
     expect(_currentScaleX(tester), 2.0);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('manual pinch zoom works after pan reset and axis readjustment',
+      (tester) async {
+    await _pumpChart(tester, dataCount: 80);
+
+    _disableAutoScale(tester);
+    await tester.pump();
+    final chartGesture = _chartScaleGesture(tester);
+    chartGesture.onScaleStart!(
+      ScaleStartDetails(
+        focalPoint: const Offset(160, 200),
+        localFocalPoint: const Offset(160, 200),
+        pointerCount: 2,
+      ),
+    );
+    chartGesture.onScaleUpdate!(
+      ScaleUpdateDetails(
+        focalPoint: const Offset(160, 200),
+        localFocalPoint: const Offset(160, 200),
+        scale: 2,
+        verticalScale: 2,
+        pointerCount: 2,
+      ),
+    );
+    chartGesture.onScaleEnd!(ScaleEndDetails());
+    await tester.pump();
+    expect(_currentScaleX(tester), 2.0);
+
+    await tester.tap(find.byIcon(Icons.double_arrow));
+    await tester.pump();
+    expect(_currentScaleX(tester), 1.0);
+    expect(_currentMainAxisRange(tester), isNull);
+
+    final horizontalGesture = _horizontalDragGesture(tester);
+    horizontalGesture.onHorizontalDragUpdate!(
+      DragUpdateDetails(
+        globalPosition: const Offset(220, 200),
+        localPosition: const Offset(220, 200),
+        delta: const Offset(120, 0),
+        primaryDelta: 120,
+      ),
+    );
+    await tester.pump();
+    expect(_currentScrollX(tester), greaterThan(0));
+
+    _disableAutoScale(tester);
+    await tester.pump();
+    final readjustedRange = _currentMainAxisRange(tester);
+    expect(readjustedRange, isNotNull);
+
+    chartGesture.onScaleStart!(
+      ScaleStartDetails(
+        focalPoint: const Offset(160, 200),
+        localFocalPoint: const Offset(160, 200),
+        pointerCount: 2,
+      ),
+    );
+    chartGesture.onScaleUpdate!(
+      ScaleUpdateDetails(
+        focalPoint: const Offset(160, 200),
+        localFocalPoint: const Offset(160, 200),
+        scale: 2,
+        verticalScale: 2,
+        pointerCount: 2,
+      ),
+    );
+    chartGesture.onScaleEnd!(ScaleEndDetails());
+    await tester.pump();
+
+    final zoomedRange = _currentMainAxisRange(tester);
+    expect(_currentScaleX(tester), 2.0);
+    expect(zoomedRange, isNotNull);
+    expect(zoomedRange!.span, lessThan(readjustedRange!.span));
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _pumpChart(
@@ -287,6 +362,12 @@ GestureDetector _axisGesture(WidgetTester tester) {
             widget.onVerticalDragStart != null &&
             widget.onVerticalDragUpdate != null,
       );
+}
+
+GestureDetector _horizontalDragGesture(WidgetTester tester) {
+  return tester
+      .widgetList<GestureDetector>(find.byType(GestureDetector))
+      .singleWhere((widget) => widget.onHorizontalDragUpdate != null);
 }
 
 void _disableAutoScale(WidgetTester tester) {

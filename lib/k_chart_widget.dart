@@ -269,6 +269,10 @@ class _KChartWidgetState extends State<KChartWidget>
           behavior: HitTestBehavior.translucent,
           onPointerDown: (event) {
             _activePointerIds.add(event.pointer);
+            if (_activePointerIds.length >= 2) {
+              _prepareForScaleGesture();
+              return;
+            }
             if (_activePointerIds.length == 1 &&
                 _isMainPanePanStart(event.localPosition, baseDimension)) {
               _mainAxisPanPointer = event.pointer;
@@ -385,10 +389,7 @@ class _KChartWidgetState extends State<KChartWidget>
               _scaleStartScrollX = mScrollX;
               _scaleStartFocalX = details.localFocalPoint.dx;
               if (details.pointerCount > 1) {
-                _stopAnimation(needNotify: false);
-                if (isDrag) {
-                  _onDragChanged(false);
-                }
+                _prepareForScaleGesture();
               }
               _scaleStartMainAxisRange = _mainAxisAutoScale
                   ? null
@@ -407,15 +408,13 @@ class _KChartWidgetState extends State<KChartWidget>
                       (details.scale - 1.0).abs() > 0.001);
               if (isLongPress && !isManualAxisZoom) return;
               if (isManualAxisZoom && isLongPress) {
-                isLongPress = false;
-                mInfoWindowStream.sink.add(null);
+                _clearLongPressState();
               }
               if (isDrag) {
                 final bool isZoomGesture = details.pointerCount > 1 ||
                     (details.scale - 1.0).abs() > 0.001;
                 if (!isZoomGesture) return;
-                _stopAnimation(needNotify: false);
-                _onDragChanged(false);
+                _prepareForScaleGesture();
               }
               final double maxScaleX = _mainAxisAutoScale
                   ? _autoScaleMaxScaleX
@@ -550,6 +549,39 @@ class _KChartWidgetState extends State<KChartWidget>
     }
   }
 
+  void _prepareForScaleGesture() {
+    _stopAnimation(needNotify: false);
+    if (isDrag) {
+      _onDragChanged(false);
+    }
+    _clearLongPressState();
+    _axisDragStartRange = null;
+    _axisDragStartY = null;
+    _mainAxisPanPointer = null;
+    _lastMainAxisPanPosition = null;
+    isOnTap = false;
+  }
+
+  void _prepareForAxisDrag() {
+    _stopAnimation(needNotify: false);
+    if (isDrag) {
+      _onDragChanged(false);
+    }
+    if (isScale) {
+      isScale = false;
+    }
+    _clearLongPressState();
+    _mainAxisPanPointer = null;
+    _lastMainAxisPanPosition = null;
+    isOnTap = false;
+  }
+
+  void _clearLongPressState() {
+    if (!isLongPress) return;
+    isLongPress = false;
+    mInfoWindowStream.sink.add(null);
+  }
+
   Widget _buildMainAxisGestureLayer(BaseDimension baseDimension) {
     final bool isLeftAxis =
         widget.verticalTextAlignment == VerticalTextAlignment.left;
@@ -565,6 +597,7 @@ class _KChartWidgetState extends State<KChartWidget>
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onVerticalDragStart: (details) {
+          _prepareForAxisDrag();
           final range = _resolveCurrentMainAxisRange(mWidth);
           if (range == null) return;
           _mainAxisAutoScale = false;
