@@ -267,17 +267,15 @@ class ChartPainter extends BaseChartPainter {
   void _drawCandlePaneWatermark(Canvas canvas) {
     if (mMainRect.width <= 0 || mMainRect.height <= 0) return;
 
-    final double maxWidth = mMainRect.width * 0.42;
-    final double maxHeight = mMainRect.height * 0.30;
-    if (maxWidth < 80 || maxHeight < 18) return;
+    final double targetWidth = mMainRect.width * 0.50;
+    if (targetWidth < 80) return;
 
     final bool isLightBackground = chartColors.bgColor.computeLuminance() > 0.5;
     final Color watermarkColor =
         (isLightBackground ? Colors.black : Colors.white)
             .withValues(alpha: isLightBackground ? 0.20 : 0.10);
 
-    double fontSize = math.min(maxHeight * 0.58, maxWidth / 7.4);
-    fontSize = math.max(12.0, math.min(72.0, fontSize));
+    double fontSize = 48.0;
 
     TextPainter textPainter = _createWatermarkTextPainter(
       fontSize: fontSize,
@@ -289,18 +287,16 @@ class ChartPainter extends BaseChartPainter {
     double groupWidth = markSize + gap + textPainter.width;
     double groupHeight = math.max(markSize, textPainter.height);
 
-    while (
-        (groupWidth > maxWidth || groupHeight > maxHeight) && fontSize > 12.0) {
-      fontSize -= 1.0;
-      textPainter = _createWatermarkTextPainter(
-        fontSize: fontSize,
-        color: watermarkColor,
-      );
-      markSize = textPainter.height * 0.96;
-      gap = markSize * 0.55;
-      groupWidth = markSize + gap + textPainter.width;
-      groupHeight = math.max(markSize, textPainter.height);
-    }
+    fontSize *= targetWidth / groupWidth;
+    fontSize = math.max(12.0, fontSize);
+    textPainter = _createWatermarkTextPainter(
+      fontSize: fontSize,
+      color: watermarkColor,
+    );
+    markSize = textPainter.height * 0.96;
+    gap = markSize * 0.55;
+    groupWidth = markSize + gap + textPainter.width;
+    groupHeight = math.max(markSize, textPainter.height);
 
     final double left = mMainRect.left + (mMainRect.width - groupWidth) / 2;
     final double top = mMainRect.top + (mMainRect.height - groupHeight) / 2;
