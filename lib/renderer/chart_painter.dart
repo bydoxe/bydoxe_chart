@@ -1,4 +1,5 @@
 import 'dart:async' show StreamSink;
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:bydoxe_chart/utils/number_util.dart';
 import '../entity/info_window_entity.dart';
@@ -259,6 +260,114 @@ class ChartPainter extends BaseChartPainter {
     Rect dateRect =
         Rect.fromLTRB(0, size.height - mBottomPadding, size.width, size.height);
     canvas.drawRect(dateRect, mBgPaint);
+
+    _drawCandlePaneWatermark(canvas);
+  }
+
+  void _drawCandlePaneWatermark(Canvas canvas) {
+    if (mMainRect.width <= 0 || mMainRect.height <= 0) return;
+
+    final double maxWidth = mMainRect.width * 0.42;
+    final double maxHeight = mMainRect.height * 0.30;
+    if (maxWidth < 80 || maxHeight < 18) return;
+
+    final bool isLightBackground = chartColors.bgColor.computeLuminance() > 0.5;
+    final Color watermarkColor =
+        (isLightBackground ? Colors.black : Colors.white)
+            .withValues(alpha: isLightBackground ? 0.20 : 0.10);
+
+    double fontSize = math.min(maxHeight * 0.58, maxWidth / 7.4);
+    fontSize = math.max(12.0, math.min(72.0, fontSize));
+
+    TextPainter textPainter = _createWatermarkTextPainter(
+      fontSize: fontSize,
+      color: watermarkColor,
+    );
+
+    double markSize = textPainter.height * 0.96;
+    double gap = markSize * 0.55;
+    double groupWidth = markSize + gap + textPainter.width;
+    double groupHeight = math.max(markSize, textPainter.height);
+
+    while (
+        (groupWidth > maxWidth || groupHeight > maxHeight) && fontSize > 12.0) {
+      fontSize -= 1.0;
+      textPainter = _createWatermarkTextPainter(
+        fontSize: fontSize,
+        color: watermarkColor,
+      );
+      markSize = textPainter.height * 0.96;
+      gap = markSize * 0.55;
+      groupWidth = markSize + gap + textPainter.width;
+      groupHeight = math.max(markSize, textPainter.height);
+    }
+
+    final double left = mMainRect.left + (mMainRect.width - groupWidth) / 2;
+    final double top = mMainRect.top + (mMainRect.height - groupHeight) / 2;
+
+    canvas.save();
+    canvas.clipRect(mMainRect);
+    _drawWatermarkMark(
+      canvas,
+      Rect.fromLTWH(
+          left, top + (groupHeight - markSize) / 2, markSize, markSize),
+      watermarkColor,
+    );
+    textPainter.paint(
+      canvas,
+      Offset(
+        left + markSize + gap,
+        top + (groupHeight - textPainter.height) / 2,
+      ),
+    );
+    canvas.restore();
+  }
+
+  TextPainter _createWatermarkTextPainter({
+    required double fontSize,
+    required Color color,
+  }) {
+    final TextPainter painter = TextPainter(
+      text: TextSpan(
+        text: 'BYDOXE',
+        style: TextStyle(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: FontWeight.w800,
+          height: 1.0,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    );
+    painter.layout();
+    return painter;
+  }
+
+  void _drawWatermarkMark(Canvas canvas, Rect rect, Color color) {
+    final Paint paint = Paint()
+      ..isAntiAlias = true
+      ..style = PaintingStyle.fill
+      ..color = color;
+
+    final double unit = rect.width / 4;
+    canvas.drawRect(
+      Rect.fromLTWH(rect.left, rect.top, unit, rect.height),
+      paint,
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(rect.left + unit, rect.top + unit, unit * 2, unit),
+      paint,
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(
+          rect.left + unit * 0.35, rect.top + unit * 2, unit * 1.65, unit),
+      paint,
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(rect.left + unit, rect.top + unit * 3, unit * 2, unit),
+      paint,
+    );
   }
 
   @override
