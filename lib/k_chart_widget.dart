@@ -349,9 +349,15 @@ class _KChartWidgetState extends State<KChartWidget>
                 startRange != null &&
                 details.verticalScale.isFinite &&
                 details.verticalScale > 0) {
-              _mainAxisRangeOverride = startRange
-                  .scaleFromAnchor(startRange.center, 1 / details.verticalScale)
-                  .normalized();
+              if (details.pointerCount > 1) {
+                _mainAxisRangeOverride = startRange
+                    .scaleFromAnchor(
+                        startRange.center, 1 / details.verticalScale)
+                    .normalized();
+              } else {
+                _panMainAxisByDistance(details.focalPointDelta.dy,
+                    shouldNotify: false);
+              }
             }
             notifyChanged();
           },
@@ -360,12 +366,6 @@ class _KChartWidgetState extends State<KChartWidget>
             _lastScale = mScaleX;
             _scaleStartMainAxisRange = null;
           },
-          onVerticalDragUpdate: (details) {
-            if (isScale || isLongPress || _mainAxisAutoScale) return;
-            _panMainAxisByDistance(details.primaryDelta ?? 0);
-          },
-          onVerticalDragEnd: (_) => _onDragChanged(false),
-          onVerticalDragCancel: () => _onDragChanged(false),
           onLongPressStart: (details) {
             isOnTap = false;
             isLongPress = true;
@@ -612,7 +612,7 @@ class _KChartWidgetState extends State<KChartWidget>
     return range.isValid ? range : null;
   }
 
-  void _panMainAxisByDistance(double distance) {
+  void _panMainAxisByDistance(double distance, {bool shouldNotify = true}) {
     if (distance.abs() < 0.001) return;
     final range = _resolveCurrentMainAxisRange(mWidth);
     if (range == null) return;
@@ -627,7 +627,9 @@ class _KChartWidgetState extends State<KChartWidget>
     final double deltaValue = (distance / height) * range.span;
     _mainAxisAutoScale = false;
     _mainAxisRangeOverride = range.panBy(deltaValue);
-    notifyChanged();
+    if (shouldNotify) {
+      notifyChanged();
+    }
   }
 
   void _resetMainAxisScale() {
