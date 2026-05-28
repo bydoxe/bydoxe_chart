@@ -67,7 +67,7 @@ void main() {
     await tester.pump();
     expect(_currentScrollX(tester), greaterThan(0));
 
-    await tester.tap(find.byIcon(Icons.refresh));
+    await tester.tap(find.byIcon(Icons.double_arrow));
     await tester.pump();
 
     expect(_currentMainAxisRange(tester), isNull);
@@ -75,9 +75,59 @@ void main() {
     expect(_currentScrollX(tester), 0.0);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('places manual axis reset button below summary by the price axis',
+      (tester) async {
+    await _pumpChart(
+      tester,
+      verticalTextAlignment: VerticalTextAlignment.right,
+    );
+
+    final axisGesture = tester
+        .widgetList<GestureDetector>(find.byType(GestureDetector))
+        .singleWhere(
+          (widget) =>
+              widget.onVerticalDragStart != null &&
+              widget.onVerticalDragUpdate != null,
+        );
+    axisGesture.onVerticalDragStart!(
+      DragStartDetails(localPosition: const Offset(10, 100)),
+    );
+    axisGesture.onVerticalDragUpdate!(
+      DragUpdateDetails(
+        globalPosition: const Offset(300, 180),
+        localPosition: const Offset(10, 180),
+      ),
+    );
+    await tester.pump();
+
+    final buttonFinder = find.byIcon(Icons.double_arrow);
+    expect(buttonFinder, findsOneWidget);
+    expect(find.byIcon(Icons.refresh), findsNothing);
+
+    final positioned = tester.widget<Positioned>(
+      find.ancestor(of: buttonFinder, matching: find.byType(Positioned)).first,
+    );
+    expect(positioned.top, 36);
+    expect(positioned.right, 56);
+    expect(positioned.width, 28);
+    expect(positioned.height, 24);
+
+    final decoratedBox = tester.widget<DecoratedBox>(
+      find
+          .ancestor(of: buttonFinder, matching: find.byType(DecoratedBox))
+          .first,
+    );
+    final decoration = decoratedBox.decoration as BoxDecoration;
+    expect(decoration.border, isNull);
+    expect(decoration.color?.a, closeTo(0.62, 0.01));
+  });
 }
 
-Future<void> _pumpChart(WidgetTester tester) async {
+Future<void> _pumpChart(
+  WidgetTester tester, {
+  VerticalTextAlignment verticalTextAlignment = VerticalTextAlignment.left,
+}) async {
   final data = List<KLineEntity>.generate(
     8,
     (index) => KLineEntity.fromCustom(
@@ -101,6 +151,7 @@ Future<void> _pumpChart(WidgetTester tester) async {
           ChartStyle(),
           ChartColors(),
           mainStateLi: const {MainState.MA},
+          verticalTextAlignment: verticalTextAlignment,
           isTrendLine: false,
         ),
       ),

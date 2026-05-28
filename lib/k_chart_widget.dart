@@ -556,34 +556,27 @@ class _KChartWidgetState extends State<KChartWidget>
   Widget _buildMainAxisResetButton(BaseDimension baseDimension) {
     final bool isLeftAxis =
         widget.verticalTextAlignment == VerticalTextAlignment.left;
-    final double top = max(
-      0,
-      widget.chartStyle.topPadding +
-          baseDimension.totalLabelHeight +
-          _resolveMainRectHeight(baseDimension) -
-          30,
-    ).toDouble();
+    const double axisWidth = 56;
+    const double buttonWidth = 28;
+    final double top =
+        widget.chartStyle.topPadding + baseDimension.totalLabelHeight + 4;
     return Positioned(
       top: top,
-      left: isLeftAxis ? 4 : null,
-      right: isLeftAxis ? null : 4,
-      width: 28,
+      left: isLeftAxis ? axisWidth : null,
+      right: isLeftAxis ? null : axisWidth,
+      width: buttonWidth,
       height: 24,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: _resetMainAxisScale,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: widget.chartColors.selectFillColor,
-            border: Border.all(
-              color: widget.chartColors.selectBorderColor,
-              width: 0.5,
-            ),
+            color: widget.chartColors.selectFillColor.withValues(alpha: 0.62),
           ),
           child: Icon(
-            Icons.refresh,
-            size: 14,
-            color: widget.chartColors.defaultTextColor,
+            Icons.double_arrow,
+            size: 16,
+            color: widget.chartColors.defaultTextColor.withValues(alpha: 0.82),
           ),
         ),
       ),
