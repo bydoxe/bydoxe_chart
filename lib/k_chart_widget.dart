@@ -144,6 +144,9 @@ class _KChartWidgetState extends State<KChartWidget>
   MainAxisRange? _axisDragStartRange;
   double? _axisDragStartY;
   MainAxisRange? _scaleStartMainAxisRange;
+  final Set<int> _activePointerIds = <int>{};
+  int? _mainAxisPanPointer;
+  Offset? _lastMainAxisPanPosition;
   AnimationController? _controller;
   Animation<double>? aniX;
 
@@ -191,6 +194,9 @@ class _KChartWidgetState extends State<KChartWidget>
       _axisDragStartRange = null;
       _axisDragStartY = null;
       _scaleStartMainAxisRange = null;
+      _activePointerIds.clear();
+      _mainAxisPanPointer = null;
+      _lastMainAxisPanPosition = null;
     }
     final BaseDimension baseDimension = BaseDimension(
       mBaseHeight: widget.mBaseHeight,
@@ -247,187 +253,236 @@ class _KChartWidgetState extends State<KChartWidget>
       builder: (context, constraints) {
         mHeight = constraints.maxHeight;
         mWidth = constraints.maxWidth;
-        return GestureDetector(
-          onTapUp: (details) {
-            // if (!widget.isTrendLine && widget.onSecondaryTap != null && _painter.isInSecondaryRect(details.localPosition)) {
-            //   widget.onSecondaryTap!();
-            // }
+        return Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (event) {
+            _activePointerIds.add(event.pointer);
+            if (_activePointerIds.length == 1 &&
+                _isMainPanePanStart(event.localPosition, baseDimension)) {
+              _mainAxisPanPointer = event.pointer;
+              _lastMainAxisPanPosition = event.localPosition;
+            }
+          },
+          onPointerMove: (event) {
+            if (event.pointer != _mainAxisPanPointer ||
+                _activePointerIds.length != 1 ||
+                isLongPress) {
+              return;
+            }
+            final previous = _lastMainAxisPanPosition;
+            _lastMainAxisPanPosition = event.localPosition;
+            if (previous == null) return;
+            _panMainAxisByDistance(event.localPosition.dy - previous.dy);
+          },
+          onPointerUp: (event) => _finishPointerTracking(event.pointer),
+          onPointerCancel: (event) => _finishPointerTracking(event.pointer),
+          child: GestureDetector(
+            onTapUp: (details) {
+              // if (!widget.isTrendLine && widget.onSecondaryTap != null && _painter.isInSecondaryRect(details.localPosition)) {
+              //   widget.onSecondaryTap!();
+              // }
 
-            if (!widget.isTrendLine &&
-                _painter.isInMainRect(details.localPosition)) {
-              isOnTap = true;
-              // hit test position chips/buttons first
-              final hit =
-                  _hitTestPosition(details.localPosition, _painter) ?? false;
-              // if not hit on position elements, check now price chip when pinned
-              if (!hit && _painter.nowPricePinned == true) {
-                final Rect? chipRect = _painter.nowPriceChipRect;
-                if (chipRect != null &&
-                    chipRect.contains(details.localPosition)) {
-                  // jump to latest: scroll to rightmost
-                  setState(() {
-                    // Jump to latest candle (rightmost): scrollX = 0
-                    mScrollX = 0;
-                  });
-                  notifyChanged();
+              if (!widget.isTrendLine &&
+                  _painter.isInMainRect(details.localPosition)) {
+                isOnTap = true;
+                // hit test position chips/buttons first
+                final hit =
+                    _hitTestPosition(details.localPosition, _painter) ?? false;
+                // if not hit on position elements, check now price chip when pinned
+                if (!hit && _painter.nowPricePinned == true) {
+                  final Rect? chipRect = _painter.nowPriceChipRect;
+                  if (chipRect != null &&
+                      chipRect.contains(details.localPosition)) {
+                    // jump to latest: scroll to rightmost
+                    setState(() {
+                      // Jump to latest candle (rightmost): scrollX = 0
+                      mScrollX = 0;
+                    });
+                    notifyChanged();
+                    return;
+                  }
+                }
+                if (hit == true) {
                   return;
                 }
+                // if any active position exists and tap didn't hit chips/buttons, close it
+                if (activePositionId != null) {
+                  setState(() {
+                    activePositionId = null;
+                    _painter.activePositionId = null;
+                  });
+                  return;
+                }
+                if (mSelectX != details.localPosition.dx &&
+                    widget.isTapShowInfoDialog) {
+                  mSelectX = details.localPosition.dx;
+                  notifyChanged();
+                }
               }
-              if (hit == true) {
-                return;
-              }
-              // if any active position exists and tap didn't hit chips/buttons, close it
-              if (activePositionId != null) {
+              // tap outside main rect closes active position as well
+              if (activePositionId != null &&
+                  !_painter.isInMainRect(details.localPosition)) {
                 setState(() {
                   activePositionId = null;
                   _painter.activePositionId = null;
                 });
                 return;
               }
-              if (mSelectX != details.localPosition.dx &&
-                  widget.isTapShowInfoDialog) {
-                mSelectX = details.localPosition.dx;
+              if (widget.isTrendLine && !isLongPress && enableCordRecord) {
+                enableCordRecord = false;
+                Offset p1 = Offset(getTrendLineX(), mSelectY);
+                if (!waitingForOtherPairOfCords) {
+                  lines.add(TrendLine(
+                      p1, Offset(-1, -1), trendLineMax!, trendLineScale!));
+                }
+
+                if (waitingForOtherPairOfCords) {
+                  var a = lines.last;
+                  lines.removeLast();
+                  lines
+                      .add(TrendLine(a.p1, p1, trendLineMax!, trendLineScale!));
+                  waitingForOtherPairOfCords = false;
+                } else {
+                  waitingForOtherPairOfCords = true;
+                }
                 notifyChanged();
               }
-            }
-            // tap outside main rect closes active position as well
-            if (activePositionId != null &&
-                !_painter.isInMainRect(details.localPosition)) {
-              setState(() {
-                activePositionId = null;
-                _painter.activePositionId = null;
-              });
-              return;
-            }
-            if (widget.isTrendLine && !isLongPress && enableCordRecord) {
-              enableCordRecord = false;
-              Offset p1 = Offset(getTrendLineX(), mSelectY);
-              if (!waitingForOtherPairOfCords) {
-                lines.add(TrendLine(
-                    p1, Offset(-1, -1), trendLineMax!, trendLineScale!));
+            },
+            onHorizontalDragDown: (details) {
+              isOnTap = false;
+              _stopAnimation();
+            },
+            onHorizontalDragUpdate: (details) {
+              if (isScale || isLongPress) return;
+              if (!isDrag) {
+                _onDragChanged(true);
               }
-
-              if (waitingForOtherPairOfCords) {
-                var a = lines.last;
-                lines.removeLast();
-                lines.add(TrendLine(a.p1, p1, trendLineMax!, trendLineScale!));
-                waitingForOtherPairOfCords = false;
-              } else {
-                waitingForOtherPairOfCords = true;
-              }
+              mScrollX = ((details.primaryDelta ?? 0) / mScaleX + mScrollX)
+                  .clamp(0.0, ChartPainter.maxScrollX)
+                  .toDouble();
               notifyChanged();
-            }
-          },
-          onHorizontalDragDown: (details) {
-            isOnTap = false;
-            _stopAnimation();
-          },
-          onHorizontalDragUpdate: (details) {
-            if (isScale || isLongPress) return;
-            if (!isDrag) {
-              _onDragChanged(true);
-            }
-            mScrollX = ((details.primaryDelta ?? 0) / mScaleX + mScrollX)
-                .clamp(0.0, ChartPainter.maxScrollX)
-                .toDouble();
-            notifyChanged();
-          },
-          onHorizontalDragEnd: (DragEndDetails details) {
-            var velocity = details.velocity.pixelsPerSecond.dx;
-            _onFling(velocity);
-          },
-          onHorizontalDragCancel: () => _onDragChanged(false),
-          onScaleStart: (_) {
-            isScale = true;
-            _scaleStartMainAxisRange = _mainAxisAutoScale
-                ? null
-                : _resolveCurrentMainAxisRange(mWidth);
-          },
-          onScaleUpdate: (details) {
-            if (isDrag || isLongPress) return;
-            mScaleX = (_lastScale * details.scale).clamp(0.5, 2.2);
-            final startRange = _scaleStartMainAxisRange;
-            if (!_mainAxisAutoScale &&
-                startRange != null &&
-                details.verticalScale.isFinite &&
-                details.verticalScale > 0) {
-              if (details.pointerCount > 1) {
+            },
+            onHorizontalDragEnd: (DragEndDetails details) {
+              var velocity = details.velocity.pixelsPerSecond.dx;
+              _onFling(velocity);
+            },
+            onHorizontalDragCancel: () => _onDragChanged(false),
+            onScaleStart: (_) {
+              isScale = true;
+              _scaleStartMainAxisRange = _mainAxisAutoScale
+                  ? null
+                  : _resolveCurrentMainAxisRange(mWidth);
+            },
+            onScaleUpdate: (details) {
+              if (isDrag || isLongPress) return;
+              mScaleX = (_lastScale * details.scale).clamp(0.5, 2.2);
+              final startRange = _scaleStartMainAxisRange;
+              if (!_mainAxisAutoScale &&
+                  startRange != null &&
+                  details.pointerCount > 1 &&
+                  details.verticalScale.isFinite &&
+                  details.verticalScale > 0) {
                 _mainAxisRangeOverride = startRange
                     .scaleFromAnchor(
                         startRange.center, 1 / details.verticalScale)
                     .normalized();
-              } else {
-                _panMainAxisByDistance(details.focalPointDelta.dy,
-                    shouldNotify: false);
               }
-            }
-            notifyChanged();
-          },
-          onScaleEnd: (_) {
-            isScale = false;
-            _lastScale = mScaleX;
-            _scaleStartMainAxisRange = null;
-          },
-          onLongPressStart: (details) {
-            isOnTap = false;
-            isLongPress = true;
-            if ((mSelectX != details.localPosition.dx ||
-                    mSelectY != details.globalPosition.dy) &&
-                !widget.isTrendLine) {
-              mSelectX = details.localPosition.dx;
               notifyChanged();
-            }
-            //For TrendLine
-            if (widget.isTrendLine && changeInXPosition == null) {
-              mSelectX = changeInXPosition = details.localPosition.dx;
-              mSelectY = changeInYPosition = details.globalPosition.dy;
+            },
+            onScaleEnd: (_) {
+              isScale = false;
+              _lastScale = mScaleX;
+              _scaleStartMainAxisRange = null;
+            },
+            onLongPressStart: (details) {
+              isOnTap = false;
+              isLongPress = true;
+              if ((mSelectX != details.localPosition.dx ||
+                      mSelectY != details.globalPosition.dy) &&
+                  !widget.isTrendLine) {
+                mSelectX = details.localPosition.dx;
+                notifyChanged();
+              }
+              //For TrendLine
+              if (widget.isTrendLine && changeInXPosition == null) {
+                mSelectX = changeInXPosition = details.localPosition.dx;
+                mSelectY = changeInYPosition = details.globalPosition.dy;
+                notifyChanged();
+              }
+              //For TrendLine
+              if (widget.isTrendLine && changeInXPosition != null) {
+                changeInXPosition = details.localPosition.dx;
+                changeInYPosition = details.globalPosition.dy;
+                notifyChanged();
+              }
+            },
+            onLongPressMoveUpdate: (details) {
+              if ((mSelectX != details.localPosition.dx ||
+                      mSelectY != details.globalPosition.dy) &&
+                  !widget.isTrendLine) {
+                mSelectX = details.localPosition.dx;
+                mSelectY = details.localPosition.dy;
+                notifyChanged();
+              }
+              if (widget.isTrendLine) {
+                mSelectX =
+                    mSelectX + (details.localPosition.dx - changeInXPosition!);
+                changeInXPosition = details.localPosition.dx;
+                mSelectY =
+                    mSelectY + (details.globalPosition.dy - changeInYPosition!);
+                changeInYPosition = details.globalPosition.dy;
+                notifyChanged();
+              }
+            },
+            onLongPressEnd: (details) {
+              isLongPress = false;
+              enableCordRecord = true;
+              mInfoWindowStream.sink.add(null);
               notifyChanged();
-            }
-            //For TrendLine
-            if (widget.isTrendLine && changeInXPosition != null) {
-              changeInXPosition = details.localPosition.dx;
-              changeInYPosition = details.globalPosition.dy;
-              notifyChanged();
-            }
-          },
-          onLongPressMoveUpdate: (details) {
-            if ((mSelectX != details.localPosition.dx ||
-                    mSelectY != details.globalPosition.dy) &&
-                !widget.isTrendLine) {
-              mSelectX = details.localPosition.dx;
-              mSelectY = details.localPosition.dy;
-              notifyChanged();
-            }
-            if (widget.isTrendLine) {
-              mSelectX =
-                  mSelectX + (details.localPosition.dx - changeInXPosition!);
-              changeInXPosition = details.localPosition.dx;
-              mSelectY =
-                  mSelectY + (details.globalPosition.dy - changeInYPosition!);
-              changeInYPosition = details.globalPosition.dy;
-              notifyChanged();
-            }
-          },
-          onLongPressEnd: (details) {
-            isLongPress = false;
-            enableCordRecord = true;
-            mInfoWindowStream.sink.add(null);
-            notifyChanged();
-          },
-          child: Stack(
-            children: <Widget>[
-              CustomPaint(
-                size: Size(double.infinity, baseDimension.mDisplayHeight),
-                painter: _painter,
-              ),
-              if (widget.showInfoDialog) _buildInfoDialog(),
-              _buildMainAxisGestureLayer(baseDimension),
-              if (!_mainAxisAutoScale) _buildMainAxisResetButton(baseDimension),
-            ],
+            },
+            child: Stack(
+              children: <Widget>[
+                CustomPaint(
+                  size: Size(double.infinity, baseDimension.mDisplayHeight),
+                  painter: _painter,
+                ),
+                if (widget.showInfoDialog) _buildInfoDialog(),
+                _buildMainAxisGestureLayer(baseDimension),
+                if (!_mainAxisAutoScale)
+                  _buildMainAxisResetButton(baseDimension),
+              ],
+            ),
           ),
         );
       },
     );
+  }
+
+  bool _isMainPanePanStart(Offset position, BaseDimension baseDimension) {
+    if (_mainAxisAutoScale || widget.isTrendLine) return false;
+    final double top =
+        widget.chartStyle.topPadding + baseDimension.totalLabelHeight;
+    final double height = _resolveMainRectHeight(baseDimension);
+    final Rect mainRect = Rect.fromLTWH(0, top, mWidth, height);
+    if (!mainRect.contains(position)) return false;
+
+    const double axisWidth = 56;
+    if (widget.verticalTextAlignment == VerticalTextAlignment.left) {
+      return position.dx > axisWidth;
+    }
+    return position.dx < mWidth - axisWidth;
+  }
+
+  void _finishPointerTracking(int pointer) {
+    _activePointerIds.remove(pointer);
+    if (_mainAxisPanPointer == pointer) {
+      _mainAxisPanPointer = null;
+      _lastMainAxisPanPosition = null;
+    }
+    if (_activePointerIds.isEmpty) {
+      _mainAxisPanPointer = null;
+      _lastMainAxisPanPosition = null;
+    }
   }
 
   Widget _buildMainAxisGestureLayer(BaseDimension baseDimension) {
