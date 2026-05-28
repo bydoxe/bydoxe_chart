@@ -149,6 +149,10 @@ class _KChartWidgetState extends State<KChartWidget>
   MainAxisRange? _axisDragStartRange;
   double? _axisDragStartY;
   MainAxisRange? _scaleStartMainAxisRange;
+  double? _scaleStartMainAxisAnchor;
+  double _scaleStartScaleX = _defaultScaleX;
+  double _scaleStartScrollX = 0.0;
+  double _scaleStartFocalX = 0.0;
   final Set<int> _activePointerIds = <int>{};
   int? _mainAxisPanPointer;
   Offset? _lastMainAxisPanPosition;
@@ -168,7 +172,6 @@ class _KChartWidgetState extends State<KChartWidget>
     return mScaleX;
   }
 
-  double _lastScale = 1.0;
   bool isScale = false, isDrag = false, isLongPress = false, isOnTap = false;
 
   @override
@@ -194,12 +197,15 @@ class _KChartWidgetState extends State<KChartWidget>
     if (widget.datas != null && widget.datas!.isEmpty) {
       mScrollX = mSelectX = 0.0;
       mScaleX = _defaultScaleX;
-      _lastScale = _defaultScaleX;
       _mainAxisAutoScale = true;
       _mainAxisRangeOverride = null;
       _axisDragStartRange = null;
       _axisDragStartY = null;
       _scaleStartMainAxisRange = null;
+      _scaleStartMainAxisAnchor = null;
+      _scaleStartScaleX = _defaultScaleX;
+      _scaleStartScrollX = 0.0;
+      _scaleStartFocalX = 0.0;
       _activePointerIds.clear();
       _mainAxisPanPointer = null;
       _lastMainAxisPanPosition = null;
@@ -375,6 +381,9 @@ class _KChartWidgetState extends State<KChartWidget>
             onHorizontalDragCancel: () => _onDragChanged(false),
             onScaleStart: (details) {
               isScale = true;
+              _scaleStartScaleX = mScaleX;
+              _scaleStartScrollX = mScrollX;
+              _scaleStartFocalX = details.localFocalPoint.dx;
               if (details.pointerCount > 1) {
                 _stopAnimation(needNotify: false);
                 if (isDrag) {
@@ -384,9 +393,23 @@ class _KChartWidgetState extends State<KChartWidget>
               _scaleStartMainAxisRange = _mainAxisAutoScale
                   ? null
                   : _resolveCurrentMainAxisRange(mWidth);
+              _scaleStartMainAxisAnchor = _mainAxisAutoScale
+                  ? null
+                  : _resolveMainAxisValueAt(
+                      details.localFocalPoint.dy,
+                      _scaleStartMainAxisRange,
+                      baseDimension,
+                    );
             },
             onScaleUpdate: (details) {
-              if (isLongPress) return;
+              final bool isManualAxisZoom = !_mainAxisAutoScale &&
+                  (details.pointerCount > 1 ||
+                      (details.scale - 1.0).abs() > 0.001);
+              if (isLongPress && !isManualAxisZoom) return;
+              if (isManualAxisZoom && isLongPress) {
+                isLongPress = false;
+                mInfoWindowStream.sink.add(null);
+              }
               if (isDrag) {
                 final bool isZoomGesture = details.pointerCount > 1 ||
                     (details.scale - 1.0).abs() > 0.001;
@@ -397,25 +420,44 @@ class _KChartWidgetState extends State<KChartWidget>
               final double maxScaleX = _mainAxisAutoScale
                   ? _autoScaleMaxScaleX
                   : _manualAxisMaxScaleX;
-              mScaleX =
-                  (_lastScale * details.scale).clamp(_minScaleX, maxScaleX);
+              final double nextScaleX = (_scaleStartScaleX * details.scale)
+                  .clamp(_minScaleX, maxScaleX);
+              if (_mainAxisAutoScale) {
+                mScaleX = nextScaleX;
+              } else {
+                mScaleX = nextScaleX;
+                mScrollX = _resolveAnchoredScrollX(
+                  startScaleX: _scaleStartScaleX,
+                  startScrollX: _scaleStartScrollX,
+                  nextScaleX: nextScaleX,
+                  anchorX: details.localFocalPoint.dx.isFinite
+                      ? details.localFocalPoint.dx
+                      : _scaleStartFocalX,
+                );
+              }
               final startRange = _scaleStartMainAxisRange;
               if (!_mainAxisAutoScale &&
                   startRange != null &&
                   details.pointerCount > 1 &&
                   details.verticalScale.isFinite &&
                   details.verticalScale > 0) {
+                final double anchorValue = _resolveMainAxisValueAt(
+                      details.localFocalPoint.dy,
+                      startRange,
+                      baseDimension,
+                    ) ??
+                    _scaleStartMainAxisAnchor ??
+                    startRange.center;
                 _mainAxisRangeOverride = startRange
-                    .scaleFromAnchor(
-                        startRange.center, 1 / details.verticalScale)
+                    .scaleFromAnchor(anchorValue, 1 / details.verticalScale)
                     .normalized();
               }
               notifyChanged();
             },
             onScaleEnd: (_) {
               isScale = false;
-              _lastScale = mScaleX;
               _scaleStartMainAxisRange = null;
+              _scaleStartMainAxisAnchor = null;
             },
             onLongPressStart: (details) {
               isOnTap = false;
@@ -571,16 +613,30 @@ class _KChartWidgetState extends State<KChartWidget>
         onTap: _resetMainAxisScale,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: widget.chartColors.selectFillColor.withValues(alpha: 0.62),
+            color: _resolveResetButtonBackgroundColor(),
+            borderRadius: BorderRadius.circular(4),
           ),
           child: Icon(
             Icons.double_arrow,
             size: 16,
-            color: widget.chartColors.defaultTextColor.withValues(alpha: 0.82),
+            color: _resolveResetButtonIconColor(),
           ),
         ),
       ),
     );
+  }
+
+  bool get _isDarkChartBackground =>
+      widget.chartColors.bgColor.computeLuminance() < 0.5;
+
+  Color _resolveResetButtonBackgroundColor() {
+    return (_isDarkChartBackground ? Colors.white : Colors.black)
+        .withValues(alpha: _isDarkChartBackground ? 0.18 : 0.08);
+  }
+
+  Color _resolveResetButtonIconColor() {
+    return (_isDarkChartBackground ? Colors.white : Colors.black)
+        .withValues(alpha: _isDarkChartBackground ? 0.86 : 0.72);
   }
 
   double _resolveMainRectHeight(BaseDimension baseDimension) {
@@ -592,6 +648,57 @@ class _KChartWidgetState extends State<KChartWidget>
     return displayHeight -
         baseDimension.mVolumeHeight -
         baseDimension.totalSecondaryHeight;
+  }
+
+  double? _resolveMainAxisValueAt(
+    double y,
+    MainAxisRange? range,
+    BaseDimension baseDimension,
+  ) {
+    if (range == null || !range.isValid || !y.isFinite) return null;
+    final double top =
+        widget.chartStyle.topPadding + baseDimension.totalLabelHeight;
+    final double height = max(1.0, _resolveMainRectHeight(baseDimension));
+    final double ratio = ((y - top) / height).clamp(0.0, 1.0).toDouble();
+    return range.max - range.span * ratio;
+  }
+
+  double _resolveAnchoredScrollX({
+    required double startScaleX,
+    required double startScrollX,
+    required double nextScaleX,
+    required double anchorX,
+  }) {
+    final data = widget.datas;
+    if (data == null ||
+        data.isEmpty ||
+        mWidth <= 0 ||
+        startScaleX <= 0 ||
+        nextScaleX <= 0 ||
+        !anchorX.isFinite) {
+      return mScrollX;
+    }
+
+    final double startMinTranslateX = _resolveMinTranslateX(startScaleX);
+    final double startTranslateX = startScrollX + startMinTranslateX;
+    final double anchoredDataX = -startTranslateX + anchorX / startScaleX;
+    final double nextMinTranslateX = _resolveMinTranslateX(nextScaleX);
+    final double nextTranslateX = -anchoredDataX + anchorX / nextScaleX;
+    final double maxScrollX = nextMinTranslateX.abs();
+    return (nextTranslateX - nextMinTranslateX)
+        .clamp(0.0, maxScrollX)
+        .toDouble();
+  }
+
+  double _resolveMinTranslateX(double scaleX) {
+    final data = widget.datas;
+    if (data == null || data.isEmpty || scaleX <= 0) return 0.0;
+    final double dataLen = data.length * widget.chartStyle.pointWidth;
+    final double x = -dataLen +
+        mWidth / scaleX -
+        widget.chartStyle.pointWidth / 2 -
+        widget.xFrontPadding;
+    return x >= 0 ? 0.0 : x;
   }
 
   MainAxisRange? _resolveCurrentMainAxisRange(double width) {
@@ -712,7 +819,6 @@ class _KChartWidgetState extends State<KChartWidget>
         _onDragChanged(false);
       }
       mScaleX = _defaultScaleX;
-      _lastScale = _defaultScaleX;
       mScrollX = 0.0;
       mSelectX = 0.0;
       _mainAxisAutoScale = true;
@@ -720,6 +826,10 @@ class _KChartWidgetState extends State<KChartWidget>
       _axisDragStartRange = null;
       _axisDragStartY = null;
       _scaleStartMainAxisRange = null;
+      _scaleStartMainAxisAnchor = null;
+      _scaleStartScaleX = _defaultScaleX;
+      _scaleStartScrollX = 0.0;
+      _scaleStartFocalX = 0.0;
     });
   }
 

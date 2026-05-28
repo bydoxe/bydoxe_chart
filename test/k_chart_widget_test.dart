@@ -38,11 +38,7 @@ void main() {
     await tester.pump();
     expect(_currentMainAxisRange(tester), isNotNull);
 
-    final chartGesture = tester.widget<GestureDetector>(
-      find.byWidgetPredicate(
-        (widget) => widget is GestureDetector && widget.onScaleUpdate != null,
-      ),
-    );
+    final chartGesture = _chartScaleGesture(tester);
     chartGesture.onScaleStart!(
       ScaleStartDetails(
         focalPoint: const Offset(160, 200),
@@ -83,22 +79,7 @@ void main() {
       verticalTextAlignment: VerticalTextAlignment.right,
     );
 
-    final axisGesture = tester
-        .widgetList<GestureDetector>(find.byType(GestureDetector))
-        .singleWhere(
-          (widget) =>
-              widget.onVerticalDragStart != null &&
-              widget.onVerticalDragUpdate != null,
-        );
-    axisGesture.onVerticalDragStart!(
-      DragStartDetails(localPosition: const Offset(10, 100)),
-    );
-    axisGesture.onVerticalDragUpdate!(
-      DragUpdateDetails(
-        globalPosition: const Offset(300, 180),
-        localPosition: const Offset(10, 180),
-      ),
-    );
+    _disableAutoScale(tester);
     await tester.pump();
 
     final buttonFinder = find.byIcon(Icons.double_arrow);
@@ -120,16 +101,107 @@ void main() {
     );
     final decoration = decoratedBox.decoration as BoxDecoration;
     expect(decoration.border, isNull);
-    expect(decoration.color?.a, closeTo(0.62, 0.01));
+    expect(decoration.color?.a, closeTo(0.08, 0.01));
+    expect(decoration.color?.r, closeTo(0.0, 0.01));
+    expect(decoration.color?.g, closeTo(0.0, 0.01));
+    expect(decoration.color?.b, closeTo(0.0, 0.01));
+  });
+
+  testWidgets('uses a light reset button background on dark charts',
+      (tester) async {
+    await _pumpChart(
+      tester,
+      chartColors: ChartColors(bgColor: const Color(0xff000000)),
+    );
+
+    _disableAutoScale(tester);
+    await tester.pump();
+
+    final decoratedBox = tester.widget<DecoratedBox>(
+      find
+          .ancestor(
+              of: find.byIcon(Icons.double_arrow),
+              matching: find.byType(DecoratedBox))
+          .first,
+    );
+    final decoration = decoratedBox.decoration as BoxDecoration;
+    expect(decoration.color?.a, closeTo(0.18, 0.01));
+    expect(decoration.color?.r, closeTo(1.0, 0.01));
+    expect(decoration.color?.g, closeTo(1.0, 0.01));
+    expect(decoration.color?.b, closeTo(1.0, 0.01));
+  });
+
+  testWidgets('manual pinch zoom keeps the focal point anchored',
+      (tester) async {
+    await _pumpChart(tester, dataCount: 80);
+    _disableAutoScale(tester);
+    await tester.pump();
+
+    const focalPoint = Offset(160, 200);
+    final beforePainter = _currentChartPainter(tester);
+    final beforeRange = _currentMainAxisRange(tester)!;
+    final beforeDataX = _dataXAt(
+      x: focalPoint.dx,
+      scaleX: _currentScaleX(tester),
+      scrollX: _currentScrollX(tester),
+      dataCount: 80,
+      width: beforePainter.mWidth,
+    );
+    final beforeAnchorValue = _mainAxisValueAt(
+      focalPoint.dy,
+      beforeRange,
+      beforePainter.mMainRect,
+    );
+
+    final chartGesture = _chartScaleGesture(tester);
+    chartGesture.onScaleStart!(
+      ScaleStartDetails(
+        focalPoint: focalPoint,
+        localFocalPoint: focalPoint,
+        pointerCount: 2,
+      ),
+    );
+    chartGesture.onScaleUpdate!(
+      ScaleUpdateDetails(
+        focalPoint: focalPoint,
+        localFocalPoint: focalPoint,
+        scale: 2,
+        verticalScale: 2,
+        pointerCount: 2,
+      ),
+    );
+    chartGesture.onScaleEnd!(ScaleEndDetails());
+    await tester.pump();
+
+    final afterPainter = _currentChartPainter(tester);
+    final afterRange = _currentMainAxisRange(tester)!;
+    final afterDataX = _dataXAt(
+      x: focalPoint.dx,
+      scaleX: _currentScaleX(tester),
+      scrollX: _currentScrollX(tester),
+      dataCount: 80,
+      width: afterPainter.mWidth,
+    );
+    final afterAnchorValue = _mainAxisValueAt(
+      focalPoint.dy,
+      afterRange,
+      afterPainter.mMainRect,
+    );
+
+    expect(_currentScaleX(tester), 2.0);
+    expect(afterDataX, closeTo(beforeDataX, 0.001));
+    expect(afterAnchorValue, closeTo(beforeAnchorValue, 0.001));
   });
 }
 
 Future<void> _pumpChart(
   WidgetTester tester, {
   VerticalTextAlignment verticalTextAlignment = VerticalTextAlignment.left,
+  ChartColors? chartColors,
+  int dataCount = 8,
 }) async {
   final data = List<KLineEntity>.generate(
-    8,
+    dataCount,
     (index) => KLineEntity.fromCustom(
       open: 100 + index.toDouble(),
       close: 101 + index.toDouble(),
@@ -149,12 +221,43 @@ Future<void> _pumpChart(
         child: KChartWidget(
           data,
           ChartStyle(),
-          ChartColors(),
+          chartColors ?? ChartColors(),
           mainStateLi: const {MainState.MA},
           verticalTextAlignment: verticalTextAlignment,
           isTrendLine: false,
         ),
       ),
+    ),
+  );
+}
+
+GestureDetector _chartScaleGesture(WidgetTester tester) {
+  return tester.widget<GestureDetector>(
+    find.byWidgetPredicate(
+      (widget) => widget is GestureDetector && widget.onScaleUpdate != null,
+    ),
+  );
+}
+
+GestureDetector _axisGesture(WidgetTester tester) {
+  return tester
+      .widgetList<GestureDetector>(find.byType(GestureDetector))
+      .singleWhere(
+        (widget) =>
+            widget.onVerticalDragStart != null &&
+            widget.onVerticalDragUpdate != null,
+      );
+}
+
+void _disableAutoScale(WidgetTester tester) {
+  final axisGesture = _axisGesture(tester);
+  axisGesture.onVerticalDragStart!(
+    DragStartDetails(localPosition: const Offset(10, 100)),
+  );
+  axisGesture.onVerticalDragUpdate!(
+    DragUpdateDetails(
+      globalPosition: const Offset(300, 180),
+      localPosition: const Offset(10, 180),
     ),
   );
 }
@@ -174,4 +277,25 @@ double _currentScrollX(WidgetTester tester) {
 ChartPainter _currentChartPainter(WidgetTester tester) {
   final paint = tester.widget<CustomPaint>(find.byType(CustomPaint).first);
   return paint.painter as ChartPainter;
+}
+
+double _dataXAt({
+  required double x,
+  required double scaleX,
+  required double scrollX,
+  required int dataCount,
+  required double width,
+}) {
+  return -(scrollX + _minTranslateX(scaleX, dataCount, width)) + x / scaleX;
+}
+
+double _minTranslateX(double scaleX, int dataCount, double width) {
+  final dataLen = dataCount * ChartStyle().pointWidth;
+  final x = -dataLen + width / scaleX - ChartStyle().pointWidth / 2 - 100;
+  return x >= 0 ? 0.0 : x;
+}
+
+double _mainAxisValueAt(double y, MainAxisRange range, Rect mainRect) {
+  final ratio = ((y - mainRect.top) / mainRect.height).clamp(0.0, 1.0);
+  return range.max - range.span * ratio;
 }
