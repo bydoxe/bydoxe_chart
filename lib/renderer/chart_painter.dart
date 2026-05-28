@@ -23,6 +23,7 @@ import '../entity/macd_entity.dart';
 import '../entity/stoch_rsi_entity.dart';
 import '../entity/obv_entity.dart';
 import '../entity/kdj_entity.dart';
+import 'main_axis_range.dart';
 
 class TrendLine {
   final Offset p1;
@@ -60,7 +61,7 @@ class ChartPainter extends BaseChartPainter {
   final ChartStyle chartStyle;
   final bool hideGrid;
   final bool showNowPrice;
-  double priceScale;
+  final MainAxisRange? mainAxisRangeOverride;
   final VerticalTextAlignment verticalTextAlignment;
   final NowPriceLabelAlignment nowPriceLabelAlignment;
   final BaseDimension baseDimension;
@@ -138,7 +139,7 @@ class ChartPainter extends BaseChartPainter {
     this.showNowPrice = true,
     this.fixedLength = 2,
     this.maDayList = const [5, 10, 20],
-    this.priceScale = 1.0,
+    this.mainAxisRangeOverride,
   }) : super(chartStyle,
             datas: datas,
             scaleX: scaleX,
@@ -152,7 +153,8 @@ class ChartPainter extends BaseChartPainter {
             volHidden: volHidden,
             secondaryStateLi: secondaryStateLi,
             xFrontPadding: xFrontPadding,
-            isLine: isLine) {
+            isLine: isLine,
+            mainAxisRangeOverride: mainAxisRangeOverride) {
     selectPointPaint = Paint()
       ..isAntiAlias = true
       ..strokeWidth = 0.5
@@ -202,7 +204,6 @@ class ChartPainter extends BaseChartPainter {
       this.chartColors,
       this.scaleX,
       verticalTextAlignment,
-      priceScale,
       maDayList: maDayList,
       indicatorMA: indicatorMA,
       indicatorEMA: indicatorEMA,

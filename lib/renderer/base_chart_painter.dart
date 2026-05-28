@@ -6,6 +6,7 @@ import '../chart_style.dart' show ChartStyle;
 import '../entity/k_line_entity.dart';
 import '../k_chart_widget.dart';
 import 'base_dimension.dart';
+import 'main_axis_range.dart';
 export 'package:flutter/material.dart'
     show Color, TextStyle, Rect, Canvas, Size, CustomPainter;
 
@@ -24,6 +25,7 @@ abstract class BaseChartPainter extends CustomPainter {
   bool isLongPress = false;
   bool isOnTap;
   bool isLine;
+  MainAxisRange? mainAxisRangeOverride;
 
   late Rect mMainLabelRect;
 
@@ -75,6 +77,7 @@ abstract class BaseChartPainter extends CustomPainter {
     this.isTapShowInfoDialog = false,
     this.secondaryStateLi = const <SecondaryState>{},
     this.isLine = false,
+    this.mainAxisRangeOverride,
   }) {
     mItemCount = datas?.length ?? 0;
     mPointWidth = this.chartStyle.pointWidth;
@@ -230,6 +233,11 @@ abstract class BaseChartPainter extends CustomPainter {
       for (int idx = 0; idx < mSecondaryRectList.length; ++idx) {
         getSecondaryMaxMinValue(idx, item);
       }
+    }
+    final override = mainAxisRangeOverride;
+    if (override != null && override.isValid) {
+      mMainMinValue = override.min;
+      mMainMaxValue = override.max;
     }
   }
 

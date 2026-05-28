@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:bydoxe_chart/chart_translations.dart';
 import 'package:bydoxe_chart/components/popup_info_view.dart';
 import 'package:bydoxe_chart/k_chart_plus.dart';
 import 'renderer/base_dimension.dart';
+import 'renderer/main_axis_range.dart';
 
 enum MainState { MA, BOLL, SAR, EMA, AVL }
 
@@ -137,7 +139,11 @@ class _KChartWidgetState extends State<KChartWidget>
       StreamController<InfoWindowEntity?>();
   double mScaleX = 1.0, mScrollX = 0.0, mSelectX = 0.0;
   double mHeight = 0, mWidth = 0;
-  double _priceScale = 1.0;
+  bool _mainAxisAutoScale = true;
+  MainAxisRange? _mainAxisRangeOverride;
+  MainAxisRange? _axisDragStartRange;
+  double? _axisDragStartY;
+  MainAxisRange? _scaleStartMainAxisRange;
   AnimationController? _controller;
   Animation<double>? aniX;
 
@@ -180,6 +186,11 @@ class _KChartWidgetState extends State<KChartWidget>
     if (widget.datas != null && widget.datas!.isEmpty) {
       mScrollX = mSelectX = 0.0;
       mScaleX = 1.0;
+      _mainAxisAutoScale = true;
+      _mainAxisRangeOverride = null;
+      _axisDragStartRange = null;
+      _axisDragStartY = null;
+      _scaleStartMainAxisRange = null;
     }
     final BaseDimension baseDimension = BaseDimension(
       mBaseHeight: widget.mBaseHeight,
@@ -217,7 +228,7 @@ class _KChartWidgetState extends State<KChartWidget>
       positionLabelAlignment: widget.positionLabelAlignment,
       markers: widget.markers,
       activePositionId: activePositionId,
-      priceScale: _priceScale,
+      mainAxisRangeOverride: _mainAxisAutoScale ? null : _mainAxisRangeOverride,
       indicatorMA: widget.indicatorMA,
       indicatorEMA: widget.indicatorEMA,
       indicatorRSI: widget.indicatorRSI,
@@ -326,16 +337,35 @@ class _KChartWidgetState extends State<KChartWidget>
           onHorizontalDragCancel: () => _onDragChanged(false),
           onScaleStart: (_) {
             isScale = true;
+            _scaleStartMainAxisRange = _mainAxisAutoScale
+                ? null
+                : _resolveCurrentMainAxisRange(mWidth);
           },
           onScaleUpdate: (details) {
             if (isDrag || isLongPress) return;
             mScaleX = (_lastScale * details.scale).clamp(0.5, 2.2);
+            final startRange = _scaleStartMainAxisRange;
+            if (!_mainAxisAutoScale &&
+                startRange != null &&
+                details.verticalScale.isFinite &&
+                details.verticalScale > 0) {
+              _mainAxisRangeOverride = startRange
+                  .scaleFromAnchor(startRange.center, 1 / details.verticalScale)
+                  .normalized();
+            }
             notifyChanged();
           },
           onScaleEnd: (_) {
             isScale = false;
             _lastScale = mScaleX;
+            _scaleStartMainAxisRange = null;
           },
+          onVerticalDragUpdate: (details) {
+            if (isScale || isLongPress || _mainAxisAutoScale) return;
+            _panMainAxisByDistance(details.primaryDelta ?? 0);
+          },
+          onVerticalDragEnd: (_) => _onDragChanged(false),
+          onVerticalDragCancel: () => _onDragChanged(false),
           onLongPressStart: (details) {
             isOnTap = false;
             isLongPress = true;
@@ -389,28 +419,225 @@ class _KChartWidgetState extends State<KChartWidget>
                 painter: _painter,
               ),
               if (widget.showInfoDialog) _buildInfoDialog(),
-              // 우측 가격축 전용 수직 드래그 제스처 레이어(56px)
-              Positioned(
-                top: 0,
-                right: 0,
-                bottom: 0,
-                width: 56,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onVerticalDragUpdate: (details) {
-                    final double dy = details.primaryDelta ?? 0;
-                    final double factor = 1.0 - dy * 0.005;
-                    // allow zoom-in and zoom-out; renderer will clamp to extremes
-                    _priceScale = (_priceScale * factor).clamp(0.2, 50.0);
-                    notifyChanged();
-                  },
-                ),
-              ),
+              _buildMainAxisGestureLayer(baseDimension),
+              if (!_mainAxisAutoScale) _buildMainAxisResetButton(baseDimension),
             ],
           ),
         );
       },
     );
+  }
+
+  Widget _buildMainAxisGestureLayer(BaseDimension baseDimension) {
+    final bool isLeftAxis =
+        widget.verticalTextAlignment == VerticalTextAlignment.left;
+    final double top =
+        widget.chartStyle.topPadding + baseDimension.totalLabelHeight;
+    final double height = _resolveMainRectHeight(baseDimension);
+    return Positioned(
+      top: top,
+      left: isLeftAxis ? 0 : null,
+      right: isLeftAxis ? null : 0,
+      width: 56,
+      height: height,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onVerticalDragStart: (details) {
+          final range = _resolveCurrentMainAxisRange(mWidth);
+          if (range == null) return;
+          _mainAxisAutoScale = false;
+          _mainAxisRangeOverride = range;
+          _axisDragStartRange = range;
+          _axisDragStartY = details.localPosition.dy;
+        },
+        onVerticalDragUpdate: (details) {
+          final startRange = _axisDragStartRange;
+          final startY = _axisDragStartY;
+          if (startRange == null || startY == null) return;
+          final double deltaRatio =
+              (details.localPosition.dy - startY) / max(1.0, height);
+          final double scale = exp(deltaRatio * 2.0);
+          _mainAxisRangeOverride =
+              startRange.scaleFromAnchor(startRange.center, scale);
+          notifyChanged();
+        },
+        onVerticalDragEnd: (_) {
+          _axisDragStartRange = null;
+          _axisDragStartY = null;
+        },
+        onVerticalDragCancel: () {
+          _axisDragStartRange = null;
+          _axisDragStartY = null;
+        },
+      ),
+    );
+  }
+
+  Widget _buildMainAxisResetButton(BaseDimension baseDimension) {
+    final bool isLeftAxis =
+        widget.verticalTextAlignment == VerticalTextAlignment.left;
+    final double top = max(
+      0,
+      widget.chartStyle.topPadding +
+          baseDimension.totalLabelHeight +
+          _resolveMainRectHeight(baseDimension) -
+          30,
+    ).toDouble();
+    return Positioned(
+      top: top,
+      left: isLeftAxis ? 4 : null,
+      right: isLeftAxis ? null : 4,
+      width: 28,
+      height: 24,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _resetMainAxisScale,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: widget.chartColors.selectFillColor,
+            border: Border.all(
+              color: widget.chartColors.selectBorderColor,
+              width: 0.5,
+            ),
+          ),
+          child: Icon(
+            Icons.refresh,
+            size: 14,
+            color: widget.chartColors.defaultTextColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  double _resolveMainRectHeight(BaseDimension baseDimension) {
+    final double topPadding =
+        widget.chartStyle.topPadding + baseDimension.totalLabelHeight;
+    final double displayHeight = baseDimension.mDisplayHeight -
+        topPadding -
+        widget.chartStyle.bottomPadding;
+    return displayHeight -
+        baseDimension.mVolumeHeight -
+        baseDimension.totalSecondaryHeight;
+  }
+
+  MainAxisRange? _resolveCurrentMainAxisRange(double width) {
+    final override = _mainAxisRangeOverride;
+    if (!_mainAxisAutoScale && override != null && override.isValid) {
+      return override;
+    }
+    return _resolveVisibleMainAutoRange(width);
+  }
+
+  MainAxisRange? _resolveVisibleMainAutoRange(double width) {
+    final data = widget.datas;
+    if (data == null || data.isEmpty || width <= 0 || mScaleX <= 0) {
+      return null;
+    }
+
+    final pointWidth = widget.chartStyle.pointWidth;
+    final itemCount = data.length;
+    final dataLen = itemCount * pointWidth;
+    double minTranslateX =
+        -dataLen + width / mScaleX - pointWidth / 2 - widget.xFrontPadding;
+    if (minTranslateX >= 0) minTranslateX = 0.0;
+    final translateX = mScrollX + minTranslateX;
+
+    double getX(int position) => position * pointWidth + pointWidth / 2;
+    double xToTranslateX(double x) => -translateX + x / mScaleX;
+    int indexOfTranslateX(double translateX) {
+      int start = 0;
+      int end = itemCount - 1;
+      while (end - start > 1) {
+        final mid = start + (end - start) ~/ 2;
+        final midValue = getX(mid);
+        if (translateX < midValue) {
+          end = mid;
+        } else if (translateX > midValue) {
+          start = mid;
+        } else {
+          return mid;
+        }
+      }
+      if (end == start || end == -1) return start;
+      final startValue = getX(start);
+      final endValue = getX(end);
+      return (translateX - startValue).abs() < (translateX - endValue).abs()
+          ? start
+          : end;
+    }
+
+    final startIndex =
+        indexOfTranslateX(xToTranslateX(0)).clamp(0, itemCount - 1).toInt();
+    final stopIndex =
+        indexOfTranslateX(xToTranslateX(width)).clamp(0, itemCount - 1).toInt();
+    final from = min(startIndex, stopIndex);
+    final to = max(startIndex, stopIndex);
+
+    double minValue = double.infinity;
+    double maxValue = -double.infinity;
+    for (int i = from; i <= to; i++) {
+      final item = data[i];
+      var itemMin = item.low;
+      var itemMax = item.high;
+      for (final state in widget.mainStateLi) {
+        if (state == MainState.MA) {
+          final values = item.maValueList;
+          if (values != null) {
+            for (final value in values) {
+              if (value == 0) continue;
+              itemMin = min(itemMin, value);
+              itemMax = max(itemMax, value);
+            }
+          }
+        } else if (state == MainState.BOLL) {
+          final up = item.up;
+          final dn = item.dn;
+          if (up != null) itemMax = max(itemMax, up);
+          if (dn != null) itemMin = min(itemMin, dn);
+        } else if (state == MainState.SAR &&
+            widget.chartStyle.includeSarInScale) {
+          final sar = item.sar;
+          if (sar != null) {
+            itemMin = min(itemMin, sar);
+            itemMax = max(itemMax, sar);
+          }
+        }
+      }
+      minValue = min(minValue, itemMin);
+      maxValue = max(maxValue, itemMax);
+    }
+
+    final range = MainAxisRange(min: minValue, max: maxValue).normalized();
+    return range.isValid ? range : null;
+  }
+
+  void _panMainAxisByDistance(double distance) {
+    if (distance.abs() < 0.001) return;
+    final range = _resolveCurrentMainAxisRange(mWidth);
+    if (range == null) return;
+    final double height = max(
+        1.0,
+        _resolveMainRectHeight(BaseDimension(
+          mBaseHeight: widget.mBaseHeight,
+          volHidden: widget.volHidden,
+          secondaryStateLi: widget.secondaryStateLi,
+          mainStateLi: widget.mainStateLi,
+        )));
+    final double deltaValue = (distance / height) * range.span;
+    _mainAxisAutoScale = false;
+    _mainAxisRangeOverride = range.panBy(deltaValue);
+    notifyChanged();
+  }
+
+  void _resetMainAxisScale() {
+    setState(() {
+      _mainAxisAutoScale = true;
+      _mainAxisRangeOverride = null;
+      _axisDragStartRange = null;
+      _axisDragStartY = null;
+      _scaleStartMainAxisRange = null;
+    });
   }
 
   // hit test against painter-stored rects
