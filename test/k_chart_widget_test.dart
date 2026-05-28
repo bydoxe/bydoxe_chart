@@ -305,6 +305,52 @@ void main() {
     expect(zoomedRange!.span, lessThan(readjustedRange!.span));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('real pointer pinch works after pan reset and axis readjustment',
+      (tester) async {
+    await _pumpChart(tester, dataCount: 80);
+
+    await tester.dragFrom(const Offset(20, 180), const Offset(0, 80));
+    await tester.pump();
+    expect(_currentMainAxisRange(tester), isNotNull);
+
+    await _pinchWithPointers(
+      tester,
+      startA: const Offset(150, 195),
+      startB: const Offset(170, 205),
+      endA: const Offset(120, 180),
+      endB: const Offset(200, 220),
+    );
+    expect(_currentScaleX(tester), greaterThan(1.0));
+
+    await tester.tap(find.byIcon(Icons.double_arrow));
+    await tester.pump();
+    expect(_currentScaleX(tester), 1.0);
+    expect(_currentMainAxisRange(tester), isNull);
+
+    await tester.dragFrom(const Offset(180, 220), const Offset(80, 0));
+    await tester.pump();
+    expect(_currentScrollX(tester), greaterThan(0));
+
+    await tester.dragFrom(const Offset(20, 180), const Offset(0, 80));
+    await tester.pump();
+    final readjustedRange = _currentMainAxisRange(tester);
+    expect(readjustedRange, isNotNull);
+
+    await _pinchWithPointers(
+      tester,
+      startA: const Offset(150, 195),
+      startB: const Offset(170, 205),
+      endA: const Offset(120, 180),
+      endB: const Offset(200, 220),
+    );
+
+    final zoomedRange = _currentMainAxisRange(tester);
+    expect(_currentScaleX(tester), greaterThan(1.0));
+    expect(zoomedRange, isNotNull);
+    expect(zoomedRange!.span, lessThan(readjustedRange!.span));
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _pumpChart(
@@ -381,6 +427,24 @@ void _disableAutoScale(WidgetTester tester) {
       localPosition: const Offset(10, 180),
     ),
   );
+}
+
+Future<void> _pinchWithPointers(
+  WidgetTester tester, {
+  required Offset startA,
+  required Offset startB,
+  required Offset endA,
+  required Offset endB,
+}) async {
+  final first = await tester.startGesture(startA, pointer: 41);
+  final second = await tester.startGesture(startB, pointer: 42);
+  await tester.pump();
+  await first.moveTo(endA);
+  await second.moveTo(endB);
+  await tester.pump();
+  await first.up();
+  await second.up();
+  await tester.pump();
 }
 
 MainAxisRange? _currentMainAxisRange(WidgetTester tester) {

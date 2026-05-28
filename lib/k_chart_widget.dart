@@ -154,8 +154,15 @@ class _KChartWidgetState extends State<KChartWidget>
   double _scaleStartScrollX = 0.0;
   double _scaleStartFocalX = 0.0;
   final Set<int> _activePointerIds = <int>{};
+  final Map<int, Offset> _activePointerPositions = <int, Offset>{};
   int? _mainAxisPanPointer;
   Offset? _lastMainAxisPanPosition;
+  bool _manualPinchActive = false;
+  double _manualPinchStartDistance = 0.0;
+  double _manualPinchStartVerticalDistance = 0.0;
+  double _manualPinchStartScaleX = _defaultScaleX;
+  double _manualPinchStartScrollX = 0.0;
+  MainAxisRange? _manualPinchStartRange;
   AnimationController? _controller;
   Animation<double>? aniX;
 
@@ -207,8 +214,10 @@ class _KChartWidgetState extends State<KChartWidget>
       _scaleStartScrollX = 0.0;
       _scaleStartFocalX = 0.0;
       _activePointerIds.clear();
+      _activePointerPositions.clear();
       _mainAxisPanPointer = null;
       _lastMainAxisPanPosition = null;
+      _resetManualPinchState();
     }
     final BaseDimension baseDimension = BaseDimension(
       mBaseHeight: widget.mBaseHeight,
@@ -269,8 +278,13 @@ class _KChartWidgetState extends State<KChartWidget>
           behavior: HitTestBehavior.translucent,
           onPointerDown: (event) {
             _activePointerIds.add(event.pointer);
+            _activePointerPositions[event.pointer] = event.localPosition;
             if (_activePointerIds.length >= 2) {
-              _prepareForScaleGesture();
+              if (!_mainAxisAutoScale) {
+                _beginManualPinch(baseDimension);
+              } else {
+                _prepareForScaleGesture();
+              }
               return;
             }
             if (_activePointerIds.length == 1 &&
@@ -280,6 +294,11 @@ class _KChartWidgetState extends State<KChartWidget>
             }
           },
           onPointerMove: (event) {
+            _activePointerPositions[event.pointer] = event.localPosition;
+            if (_manualPinchActive) {
+              _updateManualPinch(baseDimension);
+              return;
+            }
             if (event.pointer != _mainAxisPanPointer ||
                 _activePointerIds.length != 1 ||
                 isLongPress) {
@@ -403,6 +422,7 @@ class _KChartWidgetState extends State<KChartWidget>
                     );
             },
             onScaleUpdate: (details) {
+              if (_manualPinchActive && !_mainAxisAutoScale) return;
               final bool isManualAxisZoom = !_mainAxisAutoScale &&
                   (details.pointerCount > 1 ||
                       (details.scale - 1.0).abs() > 0.001);
@@ -539,14 +559,103 @@ class _KChartWidgetState extends State<KChartWidget>
 
   void _finishPointerTracking(int pointer) {
     _activePointerIds.remove(pointer);
+    _activePointerPositions.remove(pointer);
     if (_mainAxisPanPointer == pointer) {
       _mainAxisPanPointer = null;
       _lastMainAxisPanPosition = null;
     }
+    if (_manualPinchActive && _activePointerPositions.length < 2) {
+      isScale = false;
+      _resetManualPinchState();
+    }
     if (_activePointerIds.isEmpty) {
       _mainAxisPanPointer = null;
       _lastMainAxisPanPosition = null;
+      _activePointerPositions.clear();
+      _resetManualPinchState();
     }
+  }
+
+  void _beginManualPinch(BaseDimension baseDimension) {
+    final points = _firstTwoPointerPositions();
+    if (points == null) return;
+    _prepareForScaleGesture();
+    isScale = true;
+    _manualPinchActive = true;
+    _manualPinchStartDistance = _distance(points.$1, points.$2);
+    _manualPinchStartVerticalDistance = (points.$1.dy - points.$2.dy).abs();
+    _manualPinchStartScaleX = mScaleX;
+    _manualPinchStartScrollX = mScrollX;
+    _manualPinchStartRange = _resolveCurrentMainAxisRange(mWidth);
+    _scaleStartMainAxisRange = _manualPinchStartRange;
+    final midpoint = _midpoint(points.$1, points.$2);
+    _scaleStartMainAxisAnchor = _resolveMainAxisValueAt(
+        midpoint.dy, _manualPinchStartRange, baseDimension);
+  }
+
+  void _updateManualPinch(BaseDimension baseDimension) {
+    final points = _firstTwoPointerPositions();
+    final startRange = _manualPinchStartRange;
+    if (points == null ||
+        startRange == null ||
+        _manualPinchStartDistance <= 0 ||
+        _mainAxisAutoScale) {
+      return;
+    }
+
+    final midpoint = _midpoint(points.$1, points.$2);
+    final double distance = _distance(points.$1, points.$2);
+    if (distance <= 0) return;
+    final double scale = distance / _manualPinchStartDistance;
+    final double nextScaleX = (_manualPinchStartScaleX * scale)
+        .clamp(_minScaleX, _manualAxisMaxScaleX);
+    mScaleX = nextScaleX;
+    mScrollX = _resolveAnchoredScrollX(
+      startScaleX: _manualPinchStartScaleX,
+      startScrollX: _manualPinchStartScrollX,
+      nextScaleX: nextScaleX,
+      anchorX: midpoint.dx,
+    );
+
+    final double verticalDistance = (points.$1.dy - points.$2.dy).abs();
+    if (_manualPinchStartVerticalDistance > 0 && verticalDistance > 0) {
+      final double verticalScale =
+          verticalDistance / _manualPinchStartVerticalDistance;
+      final double anchorValue =
+          _resolveMainAxisValueAt(midpoint.dy, startRange, baseDimension) ??
+              _scaleStartMainAxisAnchor ??
+              startRange.center;
+      _mainAxisRangeOverride = startRange
+          .scaleFromAnchor(anchorValue, 1 / verticalScale)
+          .normalized();
+    }
+    notifyChanged();
+  }
+
+  (Offset, Offset)? _firstTwoPointerPositions() {
+    if (_activePointerPositions.length < 2) return null;
+    final values =
+        _activePointerPositions.values.take(2).toList(growable: false);
+    return (values[0], values[1]);
+  }
+
+  Offset _midpoint(Offset first, Offset second) {
+    return Offset((first.dx + second.dx) / 2, (first.dy + second.dy) / 2);
+  }
+
+  double _distance(Offset first, Offset second) {
+    final dx = first.dx - second.dx;
+    final dy = first.dy - second.dy;
+    return sqrt(dx * dx + dy * dy);
+  }
+
+  void _resetManualPinchState() {
+    _manualPinchActive = false;
+    _manualPinchStartDistance = 0.0;
+    _manualPinchStartVerticalDistance = 0.0;
+    _manualPinchStartScaleX = _defaultScaleX;
+    _manualPinchStartScrollX = 0.0;
+    _manualPinchStartRange = null;
   }
 
   void _prepareForScaleGesture() {
@@ -863,6 +972,7 @@ class _KChartWidgetState extends State<KChartWidget>
       _scaleStartScaleX = _defaultScaleX;
       _scaleStartScrollX = 0.0;
       _scaleStartFocalX = 0.0;
+      _resetManualPinchState();
     });
   }
 
