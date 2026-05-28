@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:bydoxe_chart/k_chart_plus.dart';
-import '../entity/vol_ma_entity.dart';
 
 class VolRenderer extends BaseChartRenderer<VolumeEntity> {
   late double mVolWidth;

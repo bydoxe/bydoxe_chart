@@ -7,7 +7,7 @@ import '../entity/k_line_entity.dart';
 import '../k_chart_widget.dart';
 import 'base_dimension.dart';
 export 'package:flutter/material.dart'
-    show Color, required, TextStyle, Rect, Canvas, Size, CustomPainter;
+    show Color, TextStyle, Rect, Canvas, Size, CustomPainter;
 
 /// BaseChartPainter
 abstract class BaseChartPainter extends CustomPainter {
