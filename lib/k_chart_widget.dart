@@ -135,6 +135,11 @@ class KChartWidget extends StatefulWidget {
 
 class _KChartWidgetState extends State<KChartWidget>
     with TickerProviderStateMixin {
+  static const double _defaultScaleX = 1.0;
+  static const double _minScaleX = 0.5;
+  static const double _autoScaleMaxScaleX = 2.2;
+  static const double _manualAxisMaxScaleX = 5.0;
+
   final StreamController<InfoWindowEntity?> mInfoWindowStream =
       StreamController<InfoWindowEntity?>();
   double mScaleX = 1.0, mScrollX = 0.0, mSelectX = 0.0;
@@ -188,7 +193,8 @@ class _KChartWidgetState extends State<KChartWidget>
   Widget build(BuildContext context) {
     if (widget.datas != null && widget.datas!.isEmpty) {
       mScrollX = mSelectX = 0.0;
-      mScaleX = 1.0;
+      mScaleX = _defaultScaleX;
+      _lastScale = _defaultScaleX;
       _mainAxisAutoScale = true;
       _mainAxisRangeOverride = null;
       _axisDragStartRange = null;
@@ -367,15 +373,32 @@ class _KChartWidgetState extends State<KChartWidget>
               _onFling(velocity);
             },
             onHorizontalDragCancel: () => _onDragChanged(false),
-            onScaleStart: (_) {
+            onScaleStart: (details) {
               isScale = true;
+              if (details.pointerCount > 1) {
+                _stopAnimation(needNotify: false);
+                if (isDrag) {
+                  _onDragChanged(false);
+                }
+              }
               _scaleStartMainAxisRange = _mainAxisAutoScale
                   ? null
                   : _resolveCurrentMainAxisRange(mWidth);
             },
             onScaleUpdate: (details) {
-              if (isDrag || isLongPress) return;
-              mScaleX = (_lastScale * details.scale).clamp(0.5, 2.2);
+              if (isLongPress) return;
+              if (isDrag) {
+                final bool isZoomGesture = details.pointerCount > 1 ||
+                    (details.scale - 1.0).abs() > 0.001;
+                if (!isZoomGesture) return;
+                _stopAnimation(needNotify: false);
+                _onDragChanged(false);
+              }
+              final double maxScaleX = _mainAxisAutoScale
+                  ? _autoScaleMaxScaleX
+                  : _manualAxisMaxScaleX;
+              mScaleX =
+                  (_lastScale * details.scale).clamp(_minScaleX, maxScaleX);
               final startRange = _scaleStartMainAxisRange;
               if (!_mainAxisAutoScale &&
                   startRange != null &&
@@ -691,6 +714,14 @@ class _KChartWidgetState extends State<KChartWidget>
 
   void _resetMainAxisScale() {
     setState(() {
+      _stopAnimation(needNotify: false);
+      if (isDrag) {
+        _onDragChanged(false);
+      }
+      mScaleX = _defaultScaleX;
+      _lastScale = _defaultScaleX;
+      mScrollX = 0.0;
+      mSelectX = 0.0;
       _mainAxisAutoScale = true;
       _mainAxisRangeOverride = null;
       _axisDragStartRange = null;

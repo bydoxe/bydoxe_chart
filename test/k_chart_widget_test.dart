@@ -29,6 +29,52 @@ void main() {
     expect(pannedRange.max, isNot(axisScaledRange.max));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('resets manual axis scale, zoom, and scroll to defaults',
+      (tester) async {
+    await _pumpChart(tester);
+
+    await tester.dragFrom(const Offset(20, 180), const Offset(0, 80));
+    await tester.pump();
+    expect(_currentMainAxisRange(tester), isNotNull);
+
+    final chartGesture = tester.widget<GestureDetector>(
+      find.byWidgetPredicate(
+        (widget) => widget is GestureDetector && widget.onScaleUpdate != null,
+      ),
+    );
+    chartGesture.onScaleStart!(
+      ScaleStartDetails(
+        focalPoint: const Offset(160, 200),
+        localFocalPoint: const Offset(160, 200),
+        pointerCount: 2,
+      ),
+    );
+    chartGesture.onScaleUpdate!(
+      ScaleUpdateDetails(
+        focalPoint: const Offset(160, 200),
+        localFocalPoint: const Offset(160, 200),
+        scale: 10,
+        pointerCount: 2,
+      ),
+    );
+    chartGesture.onScaleEnd!(ScaleEndDetails());
+    await tester.pump();
+
+    expect(_currentScaleX(tester), 5.0);
+
+    await tester.dragFrom(const Offset(180, 220), const Offset(80, 0));
+    await tester.pump();
+    expect(_currentScrollX(tester), greaterThan(0));
+
+    await tester.tap(find.byIcon(Icons.refresh));
+    await tester.pump();
+
+    expect(_currentMainAxisRange(tester), isNull);
+    expect(_currentScaleX(tester), 1.0);
+    expect(_currentScrollX(tester), 0.0);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _pumpChart(WidgetTester tester) async {
@@ -63,6 +109,18 @@ Future<void> _pumpChart(WidgetTester tester) async {
 }
 
 MainAxisRange? _currentMainAxisRange(WidgetTester tester) {
+  return _currentChartPainter(tester).mainAxisRangeOverride;
+}
+
+double _currentScaleX(WidgetTester tester) {
+  return _currentChartPainter(tester).scaleX;
+}
+
+double _currentScrollX(WidgetTester tester) {
+  return _currentChartPainter(tester).scrollX;
+}
+
+ChartPainter _currentChartPainter(WidgetTester tester) {
   final paint = tester.widget<CustomPaint>(find.byType(CustomPaint).first);
-  return (paint.painter as ChartPainter).mainAxisRangeOverride;
+  return paint.painter as ChartPainter;
 }
