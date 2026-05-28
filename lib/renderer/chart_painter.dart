@@ -290,7 +290,11 @@ class ChartPainter extends BaseChartPainter {
     final Paint paint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
-      ..color = Colors.white.withValues(alpha: isLightBackground ? 0.24 : 0.10);
+      ..colorFilter = ColorFilter.mode(
+        (isLightBackground ? Colors.black : Colors.white)
+            .withValues(alpha: isLightBackground ? 0.26 : 0.14),
+        BlendMode.srcIn,
+      );
 
     canvas.save();
     canvas.clipRect(mMainRect);
