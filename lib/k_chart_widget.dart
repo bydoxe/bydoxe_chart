@@ -321,10 +321,12 @@ class _KChartWidgetState extends State<KChartWidget>
           onHorizontalDragDown: (details) {
             isOnTap = false;
             _stopAnimation();
-            _onDragChanged(true);
           },
           onHorizontalDragUpdate: (details) {
             if (isScale || isLongPress) return;
+            if (!isDrag) {
+              _onDragChanged(true);
+            }
             mScrollX = ((details.primaryDelta ?? 0) / mScaleX + mScrollX)
                 .clamp(0.0, ChartPainter.maxScrollX)
                 .toDouble();

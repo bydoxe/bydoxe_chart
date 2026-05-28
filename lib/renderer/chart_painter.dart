@@ -274,31 +274,67 @@ class ChartPainter extends BaseChartPainter {
 
   @override
   void drawChart(Canvas canvas, Size size) {
+    _drawTransformedInRect(canvas, mMainRect, (canvas) {
+      for (int i = mStartIndex; datas != null && i <= mStopIndex; i++) {
+        KLineEntity? curPoint = datas?[i];
+        if (curPoint == null) continue;
+        KLineEntity lastPoint = i == 0 ? curPoint : datas![i - 1];
+        double curX = getX(i);
+        double lastX = i == 0 ? curX : getX(i - 1);
+
+        mMainRenderer.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
+        _drawMarkerForCandle(canvas, curX, i, curPoint);
+      }
+    });
+
+    final volRenderer = mVolRenderer;
+    final volRect = mVolRect;
+    if (volRenderer != null && volRect != null) {
+      _drawTransformedInRect(canvas, volRect, (canvas) {
+        for (int i = mStartIndex; datas != null && i <= mStopIndex; i++) {
+          KLineEntity? curPoint = datas?[i];
+          if (curPoint == null) continue;
+          KLineEntity lastPoint = i == 0 ? curPoint : datas![i - 1];
+          double curX = getX(i);
+          double lastX = i == 0 ? curX : getX(i - 1);
+
+          volRenderer.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
+        }
+      });
+    }
+
+    for (final renderer in mSecondaryRendererList) {
+      _drawTransformedInRect(canvas, renderer.chartRect, (canvas) {
+        for (int i = mStartIndex; datas != null && i <= mStopIndex; i++) {
+          KLineEntity? curPoint = datas?[i];
+          if (curPoint == null) continue;
+          KLineEntity lastPoint = i == 0 ? curPoint : datas![i - 1];
+          double curX = getX(i);
+          double lastX = i == 0 ? curX : getX(i - 1);
+
+          renderer.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
+        }
+      });
+    }
+
     canvas.save();
     canvas.translate(mTranslateX * scaleX, 0.0);
     canvas.scale(scaleX, 1.0);
-    for (int i = mStartIndex; datas != null && i <= mStopIndex; i++) {
-      KLineEntity? curPoint = datas?[i];
-      if (curPoint == null) continue;
-      KLineEntity lastPoint = i == 0 ? curPoint : datas![i - 1];
-      double curX = getX(i);
-      double lastX = i == 0 ? curX : getX(i - 1);
-
-      mMainRenderer.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
-      mVolRenderer?.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
-      mSecondaryRendererList.forEach((element) {
-        element.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
-      });
-
-      // render marker for this candle bucket (latest only)
-      _drawMarkerForCandle(canvas, curX, i, curPoint);
-    }
-
     if ((isLongPress == true || (isTapShowInfoDialog && isOnTap)) &&
         isTrendLine == false) {
       drawCrossLine(canvas, size);
     }
     if (isTrendLine == true) drawTrendLines(canvas, size);
+    canvas.restore();
+  }
+
+  void _drawTransformedInRect(
+      Canvas canvas, Rect clipRect, void Function(Canvas canvas) draw) {
+    canvas.save();
+    canvas.clipRect(clipRect);
+    canvas.translate(mTranslateX * scaleX, 0.0);
+    canvas.scale(scaleX, 1.0);
+    draw(canvas);
     canvas.restore();
   }
 
