@@ -4,6 +4,7 @@ import 'package:bydoxe_chart/chart_translations.dart';
 import '../entity/k_line_entity.dart';
 import '../utils/date_format_util.dart';
 import '../utils/number_util.dart';
+import '../utils/price_label_util.dart';
 
 class PopupInfoView extends StatelessWidget {
   final KLineEntity entity;
@@ -13,6 +14,7 @@ class PopupInfoView extends StatelessWidget {
   final bool materialInfoDialog;
   final List<String> timeFormat;
   final int fixedLength;
+  final double? priceLabelTickSize;
 
   const PopupInfoView({
     Key? key,
@@ -23,6 +25,7 @@ class PopupInfoView extends StatelessWidget {
     required this.materialInfoDialog,
     required this.timeFormat,
     required this.fixedLength,
+    this.priceLabelTickSize,
   }) : super(key: key);
 
   @override
@@ -53,15 +56,25 @@ class PopupInfoView extends StatelessWidget {
       children: [
         _buildItem(chartTranslations.date, getDate(entity.time)),
         _buildItem(
-            chartTranslations.open, entity.open.toStringAsFixed(fixedLength)),
+            chartTranslations.open,
+            formatPriceLabel(entity.open,
+                fixedLength: fixedLength, tickSize: priceLabelTickSize)),
         _buildItem(
-            chartTranslations.high, entity.high.toStringAsFixed(fixedLength)),
+            chartTranslations.high,
+            formatPriceLabel(entity.high,
+                fixedLength: fixedLength, tickSize: priceLabelTickSize)),
         _buildItem(
-            chartTranslations.low, entity.low.toStringAsFixed(fixedLength)),
+            chartTranslations.low,
+            formatPriceLabel(entity.low,
+                fixedLength: fixedLength, tickSize: priceLabelTickSize)),
         _buildItem(
-            chartTranslations.close, entity.close.toStringAsFixed(fixedLength)),
+            chartTranslations.close,
+            formatPriceLabel(entity.close,
+                fixedLength: fixedLength, tickSize: priceLabelTickSize)),
         _buildColorItem(chartTranslations.changeAmount,
-            upDown.toStringAsFixed(fixedLength), upDown > 0),
+            formatPriceLabel(upDown,
+                fixedLength: fixedLength, tickSize: priceLabelTickSize),
+            upDown > 0),
         _buildColorItem(chartTranslations.change,
             '${upDownPercent.toStringAsFixed(2)}%', upDownPercent > 0),
         _buildItem(chartTranslations.vol, NumberUtil.format(entity.vol)),

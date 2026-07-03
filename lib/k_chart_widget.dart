@@ -57,6 +57,7 @@ class KChartWidget extends StatefulWidget {
   final void Function(bool isLeft, int ts)? onEdgeLoadTs;
 
   final int fixedLength;
+  final double? priceLabelTickSize;
   final List<int> maDayList;
   final int flingTime;
   final double flingRatio;
@@ -106,6 +107,7 @@ class KChartWidget extends StatefulWidget {
     this.onLoadMore,
     this.onEdgeLoadTs,
     this.fixedLength = 2,
+    this.priceLabelTickSize,
     this.maDayList = const [5, 10, 20],
     this.flingTime = 600,
     this.flingRatio = 0.5,
@@ -277,6 +279,7 @@ class _KChartWidgetState extends State<KChartWidget>
       showNowPrice: widget.showNowPrice,
       candlePaneLogo: _candlePaneLogo,
       fixedLength: widget.fixedLength,
+      priceLabelTickSize: widget.priceLabelTickSize,
       maDayList: widget.maDayList,
       verticalTextAlignment: widget.verticalTextAlignment,
       nowPriceLabelAlignment: widget.nowPriceLabelAlignment,
@@ -1150,6 +1153,7 @@ class _KChartWidgetState extends State<KChartWidget>
               materialInfoDialog: widget.materialInfoDialog,
               timeFormat: widget.timeFormat,
               fixedLength: widget.fixedLength,
+              priceLabelTickSize: widget.priceLabelTickSize,
             ),
           );
         }
@@ -1164,6 +1168,7 @@ class _KChartWidgetState extends State<KChartWidget>
             materialInfoDialog: widget.materialInfoDialog,
             timeFormat: widget.timeFormat,
             fixedLength: widget.fixedLength,
+            priceLabelTickSize: widget.priceLabelTickSize,
           ),
         );
       },

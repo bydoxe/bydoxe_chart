@@ -39,6 +39,7 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
   final IndicatorBOLL? indicatorBOLL;
   final IndicatorSAR? indicatorSAR;
   final IndicatorAVL? indicatorAVL;
+  final double? priceLabelTickSize;
 
   MainRenderer(
     Rect mainRect,
@@ -52,6 +53,7 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
     this.chartColors,
     this.scaleX,
     this.verticalTextAlignment, {
+    this.priceLabelTickSize,
     this.maDayList = const [5, 10, 20],
     this.indicatorMA,
     this.indicatorEMA,
@@ -64,6 +66,7 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
             minValue: minValue,
             topPadding: topPadding,
             fixedLength: fixedLength,
+            priceLabelTickSize: priceLabelTickSize,
             gridColor: chartColors.gridColor) {
     mCandleWidth = this.chartStyle.candleWidth;
     mCandleLineWidth = this.chartStyle.candleLineWidth;

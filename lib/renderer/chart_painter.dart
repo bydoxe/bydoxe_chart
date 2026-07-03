@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:bydoxe_chart/utils/number_util.dart';
+import 'package:bydoxe_chart/utils/price_label_util.dart';
 import '../entity/info_window_entity.dart';
 import '../entity/k_line_entity.dart';
 import '../utils/date_format_util.dart';
@@ -57,6 +58,7 @@ class ChartPainter extends BaseChartPainter {
   Color? volColor;
   Color? macdColor, difColor, deaColor, jColor;
   int fixedLength;
+  final double? priceLabelTickSize;
   List<int> maDayList;
   final ChartColors chartColors;
   late Paint selectPointPaint, selectorBorderPaint, nowPricePaint;
@@ -142,6 +144,7 @@ class ChartPainter extends BaseChartPainter {
     this.showNowPrice = true,
     this.candlePaneLogo,
     this.fixedLength = 2,
+    this.priceLabelTickSize,
     this.maDayList = const [5, 10, 20],
     this.mainAxisRangeOverride,
   }) : super(chartStyle,
@@ -209,6 +212,7 @@ class ChartPainter extends BaseChartPainter {
       this.chartColors,
       this.scaleX,
       verticalTextAlignment,
+      priceLabelTickSize: priceLabelTickSize,
       maDayList: maDayList,
       indicatorMA: indicatorMA,
       indicatorEMA: indicatorEMA,
@@ -621,12 +625,22 @@ class ChartPainter extends BaseChartPainter {
     if (x < mWidth / 2) {
       //draw right
       TextPainter tp = getTextPainter(
-          "── " + mMainLowMinValue.toStringAsFixed(fixedLength),
+          "── " +
+              formatPriceLabel(
+                mMainLowMinValue,
+                fixedLength: fixedLength,
+                tickSize: priceLabelTickSize,
+              ),
           chartColors.minColor);
       tp.paint(canvas, Offset(x, y - tp.height / 2));
     } else {
       TextPainter tp = getTextPainter(
-          mMainLowMinValue.toStringAsFixed(fixedLength) + " ──",
+          formatPriceLabel(
+                mMainLowMinValue,
+                fixedLength: fixedLength,
+                tickSize: priceLabelTickSize,
+              ) +
+              " ──",
           chartColors.minColor);
       tp.paint(canvas, Offset(x - tp.width, y - tp.height / 2));
     }
@@ -635,12 +649,22 @@ class ChartPainter extends BaseChartPainter {
     if (x < mWidth / 2) {
       //draw right
       TextPainter tp = getTextPainter(
-          "── " + mMainHighMaxValue.toStringAsFixed(fixedLength),
+          "── " +
+              formatPriceLabel(
+                mMainHighMaxValue,
+                fixedLength: fixedLength,
+                tickSize: priceLabelTickSize,
+              ),
           chartColors.maxColor);
       tp.paint(canvas, Offset(x, y - tp.height / 2));
     } else {
       TextPainter tp = getTextPainter(
-          mMainHighMaxValue.toStringAsFixed(fixedLength) + " ──",
+          formatPriceLabel(
+                mMainHighMaxValue,
+                fixedLength: fixedLength,
+                tickSize: priceLabelTickSize,
+              ) +
+              " ──",
           chartColors.maxColor);
       tp.paint(canvas, Offset(x - tp.width, y - tp.height / 2));
     }
@@ -678,7 +702,11 @@ class ChartPainter extends BaseChartPainter {
 
     // compute label text painter (slightly smaller font)
     TextPainter tp = getChipTextPainter(
-      value.toStringAsFixed(fixedLength),
+      formatPriceLabel(
+        value,
+        fixedLength: fixedLength,
+        tickSize: priceLabelTickSize,
+      ),
       nowColor,
     );
 
@@ -856,7 +884,11 @@ class ChartPainter extends BaseChartPainter {
       final double radius = 4.0;
 
       // 2) right-side price chip (bg=chart bg, colored border & text)
-      final String priceText = p.price.toStringAsFixed(fixedLength);
+      final String priceText = formatPriceLabel(
+        p.price,
+        fixedLength: fixedLength,
+        tickSize: priceLabelTickSize,
+      );
       final TextPainter priceTP = getChipTextPainter(priceText, posColor);
       final double priceChipHeight = priceTP.height + 2 * padV;
       double priceTop = clampedY - priceChipHeight / 2;
@@ -888,8 +920,16 @@ class ChartPainter extends BaseChartPainter {
       final String side =
           (p.isLong == null) ? '' : (p.isLong! ? 'LONG' : 'SHORT');
       final String roeStr = NumberUtil.calculateUnrealizedRoe(
-        p.price.toStringAsFixed(fixedLength),
-        cur.toStringAsFixed(fixedLength),
+        formatPriceLabel(
+          p.price,
+          fixedLength: fixedLength,
+          tickSize: priceLabelTickSize,
+        ),
+        formatPriceLabel(
+          cur,
+          fixedLength: fixedLength,
+          tickSize: priceLabelTickSize,
+        ),
         p.leverage,
         side,
       );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/price_label_util.dart';
 
 export '../chart_style.dart';
 
@@ -8,6 +9,7 @@ abstract class BaseChartRenderer<T> {
   double topPadding;
   Rect chartRect;
   int fixedLength;
+  final double? priceLabelTickSize;
   Paint chartPaint = Paint()
     ..isAntiAlias = true
     ..filterQuality = FilterQuality.high
@@ -25,6 +27,7 @@ abstract class BaseChartRenderer<T> {
     required this.minValue,
     required this.topPadding,
     required this.fixedLength,
+    this.priceLabelTickSize,
     required Color gridColor,
   }) {
     if (maxValue == minValue) {
@@ -39,11 +42,11 @@ abstract class BaseChartRenderer<T> {
   double getY(double y) => (maxValue - y) * scaleY + chartRect.top;
 
   String format(double? n) {
-    if (n == null || n.isNaN) {
-      return "0.00";
-    } else {
-      return n.toStringAsFixed(fixedLength);
-    }
+    return formatPriceLabel(
+      n,
+      fixedLength: fixedLength,
+      tickSize: priceLabelTickSize,
+    );
   }
 
   void drawGrid(Canvas canvas, int gridRows, int gridColumns);
