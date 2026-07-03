@@ -192,8 +192,9 @@ class ChartPainter extends BaseChartPainter {
         );
       }
       var t = datas![0];
-      fixedLength =
+      final detectedFixedLength =
           NumberUtil.getMaxDecimalLength(t.open, t.close, t.high, t.low);
+      fixedLength = math.max(fixedLength, detectedFixedLength);
     }
     mMainRenderer = MainRenderer(
       mMainRect,
