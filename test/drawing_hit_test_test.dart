@@ -28,6 +28,106 @@ void main() {
     expect(result?.kind, DrawingHitTestKind.body);
   });
 
+  test('hits a point near an extended line beyond its second anchor', () {
+    final mapper = _mapper();
+    final tester = DrawingHitTester(
+      mapper: mapper,
+      drawings: const [
+        ChartDrawingEntity(
+          id: 4,
+          type: ChartDrawingTool.extendedLine,
+          anchors: [
+            ChartDrawingAnchor(time: 1000, price: 100),
+            ChartDrawingAnchor(time: 1000 + 5 * _minute, price: 105),
+          ],
+        ),
+      ],
+    );
+
+    final result = tester.hitTest(
+      mapper.anchorToOffset(
+        const ChartDrawingAnchor(time: 1000 + 8 * _minute, price: 108),
+      )!,
+    );
+
+    expect(result?.drawingId, 4);
+    expect(result?.kind, DrawingHitTestKind.body);
+  });
+
+  test('ray only hits in the forward direction', () {
+    final mapper = _mapper();
+    final tester = DrawingHitTester(
+      mapper: mapper,
+      drawings: const [
+        ChartDrawingEntity(
+          id: 5,
+          type: ChartDrawingTool.ray,
+          anchors: [
+            ChartDrawingAnchor(time: 1000 + 5 * _minute, price: 105),
+            ChartDrawingAnchor(time: 1000 + 7 * _minute, price: 107),
+          ],
+        ),
+      ],
+    );
+
+    final forward = tester.hitTest(
+      mapper.anchorToOffset(
+        const ChartDrawingAnchor(time: 1000 + 9 * _minute, price: 109),
+      )!,
+    );
+    final backward = tester.hitTest(
+      mapper.anchorToOffset(
+        const ChartDrawingAnchor(time: 1000 + 3 * _minute, price: 103),
+      )!,
+    );
+
+    expect(forward?.drawingId, 5);
+    expect(backward, isNull);
+  });
+
+  test('hits a vertical line', () {
+    final mapper = _mapper();
+    const drawing = ChartDrawingEntity(
+      id: 6,
+      type: ChartDrawingTool.verticalLine,
+      anchors: [
+        ChartDrawingAnchor(time: 1000 + 4 * _minute, price: 100),
+      ],
+    );
+    final x = mapper.anchorToX(drawing.anchors.first)!;
+
+    final result = DrawingHitTester(
+      mapper: mapper,
+      drawings: const [drawing],
+    ).hitTest(Offset(x + 2, 120));
+
+    expect(result?.drawingId, 6);
+  });
+
+  test('hits a parallel channel boundary', () {
+    final mapper = _mapper();
+    const drawing = ChartDrawingEntity(
+      id: 7,
+      type: ChartDrawingTool.parallelChannel,
+      anchors: [
+        ChartDrawingAnchor(time: 1000, price: 100),
+        ChartDrawingAnchor(time: 1000 + 5 * _minute, price: 105),
+        ChartDrawingAnchor(time: 1000, price: 110),
+      ],
+    );
+
+    final result = DrawingHitTester(
+      mapper: mapper,
+      drawings: const [drawing],
+    ).hitTest(
+      mapper.anchorToOffset(
+        const ChartDrawingAnchor(time: 1000 + 3 * _minute, price: 113),
+      )!,
+    );
+
+    expect(result?.drawingId, 7);
+  });
+
   test('misses a point far from a trend line', () {
     final mapper = _mapper();
     final tester = DrawingHitTester(

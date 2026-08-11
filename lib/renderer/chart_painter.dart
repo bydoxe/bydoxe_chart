@@ -422,6 +422,57 @@ class ChartPainter extends BaseChartPainter {
     ).hitTest(point);
   }
 
+  Rect? drawingBounds(ChartDrawingEntity drawing) {
+    if (!showDrawings ||
+        drawing.hidden ||
+        drawing.type == ChartDrawingTool.none ||
+        datas == null ||
+        datas!.isEmpty) {
+      return null;
+    }
+
+    final mapper = _drawingCoordinateMapper();
+    switch (drawing.type) {
+      case ChartDrawingTool.trendLine:
+      case ChartDrawingTool.extendedLine:
+      case ChartDrawingTool.ray:
+        return _boundsFromAnchors(mapper, drawing.anchors.take(2));
+      case ChartDrawingTool.horizontalLine:
+        if (drawing.anchors.isEmpty) return null;
+        final y = mapper.priceToY(drawing.anchors.first.price);
+        return Rect.fromLTRB(
+          mapper.mainPaneClipRect.left,
+          y,
+          mapper.mainPaneClipRect.right,
+          y,
+        );
+      case ChartDrawingTool.verticalLine:
+        if (drawing.anchors.isEmpty) return null;
+        final x = mapper.anchorToX(drawing.anchors.first);
+        if (x == null) return null;
+        return Rect.fromLTRB(
+          x,
+          mapper.mainPaneClipRect.top,
+          x,
+          mapper.mainPaneClipRect.bottom,
+        );
+      case ChartDrawingTool.parallelChannel:
+        final points = drawing.anchors
+            .take(3)
+            .map(mapper.anchorToOffset)
+            .whereType<Offset>()
+            .toList(growable: true);
+        if (points.length >= 3) {
+          points.add(points[2] + (points[1] - points[0]));
+        }
+        return _boundsFromOffsets(points);
+      case ChartDrawingTool.rectangle:
+        return _boundsFromAnchors(mapper, drawing.anchors.take(2));
+      case ChartDrawingTool.none:
+        return null;
+    }
+  }
+
   ChartDrawingAnchor? drawingAnchorAt(Offset point) {
     if (datas == null || datas!.isEmpty || !mMainRect.contains(point)) {
       return null;
@@ -449,6 +500,34 @@ class ChartPainter extends BaseChartPainter {
       mainMaxValue: mMainMaxValue,
       mainMinValue: mMainMinValue,
     );
+  }
+
+  Rect? _boundsFromAnchors(
+    ChartCoordinateMapper mapper,
+    Iterable<ChartDrawingAnchor> anchors,
+  ) {
+    return _boundsFromOffsets(
+      anchors.map(mapper.anchorToOffset).whereType<Offset>(),
+    );
+  }
+
+  Rect? _boundsFromOffsets(Iterable<Offset> points) {
+    final list = points.toList(growable: false);
+    if (list.isEmpty) {
+      return null;
+    }
+
+    var left = list.first.dx;
+    var right = list.first.dx;
+    var top = list.first.dy;
+    var bottom = list.first.dy;
+    for (final point in list.skip(1)) {
+      left = math.min(left, point.dx);
+      right = math.max(right, point.dx);
+      top = math.min(top, point.dy);
+      bottom = math.max(bottom, point.dy);
+    }
+    return Rect.fromLTRB(left, top, right, bottom);
   }
 
   void _drawTransformedInRect(

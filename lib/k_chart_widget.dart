@@ -29,6 +29,12 @@ class TimeFormat {
   ];
 }
 
+typedef ChartDrawingOverlayBuilder = Widget Function(
+  BuildContext context,
+  ChartDrawingEntity drawing,
+  Rect drawingBounds,
+);
+
 class KChartWidget extends StatefulWidget {
   final List<KLineEntity>? datas;
   final Set<MainState> mainStateLi;
@@ -81,6 +87,7 @@ class KChartWidget extends StatefulWidget {
   final bool drawingEnabled;
   final ValueChanged<List<ChartDrawingEntity>>? onDrawingsChanged;
   final void Function(ChartDrawingEvent event)? onDrawingEvent;
+  final ChartDrawingOverlayBuilder? selectedDrawingOverlayBuilder;
   final bool isTrendLine;
   final double xFrontPadding;
   final List<IndicatorMA>? indicatorMA;
@@ -139,6 +146,7 @@ class KChartWidget extends StatefulWidget {
     this.drawingEnabled = false,
     this.onDrawingsChanged,
     this.onDrawingEvent,
+    this.selectedDrawingOverlayBuilder,
     this.mBaseHeight = 360,
     this.indicatorMA,
     this.indicatorEMA,
@@ -333,6 +341,10 @@ class _KChartWidgetState extends State<KChartWidget>
       builder: (context, constraints) {
         mHeight = constraints.maxHeight;
         mWidth = constraints.maxWidth;
+        _preparePainterGeometry(
+          _painter,
+          Size(constraints.maxWidth, baseDimension.mDisplayHeight),
+        );
         return Listener(
           behavior: HitTestBehavior.translucent,
           onPointerDown: (event) {
@@ -629,6 +641,8 @@ class _KChartWidgetState extends State<KChartWidget>
                 _buildMainAxisGestureLayer(baseDimension),
                 if (!_mainAxisAutoScale)
                   _buildMainAxisResetButton(baseDimension),
+                if (_buildSelectedDrawingOverlay(_painter) case final overlay?)
+                  overlay,
               ],
             ),
           ),
@@ -665,19 +679,23 @@ class _KChartWidgetState extends State<KChartWidget>
     }
 
     switch (widget.drawingTool) {
+      case ChartDrawingTool.verticalLine:
       case ChartDrawingTool.horizontalLine:
         _createDrawing([anchor], widget.drawingTool);
         return true;
       case ChartDrawingTool.trendLine:
+      case ChartDrawingTool.extendedLine:
+      case ChartDrawingTool.ray:
       case ChartDrawingTool.rectangle:
-        _handleTwoAnchorDrawingTap(anchor, widget.drawingTool);
+      case ChartDrawingTool.parallelChannel:
+        _handleMultiAnchorDrawingTap(anchor, widget.drawingTool);
         return true;
       case ChartDrawingTool.none:
         return false;
     }
   }
 
-  void _handleTwoAnchorDrawingTap(
+  void _handleMultiAnchorDrawingTap(
     ChartDrawingAnchor anchor,
     ChartDrawingTool tool,
   ) {
@@ -688,7 +706,7 @@ class _KChartWidgetState extends State<KChartWidget>
         _draftDrawing = DrawingController.createDrawing(
           id: -1,
           tool: tool,
-          anchors: <ChartDrawingAnchor>[anchor, anchor],
+          anchors: <ChartDrawingAnchor>[anchor],
           style: widget.drawingStyle,
         );
       });
@@ -701,7 +719,15 @@ class _KChartWidgetState extends State<KChartWidget>
       return;
     }
 
-    _createDrawing(<ChartDrawingAnchor>[draft.anchors.first, anchor], tool);
+    final anchors = <ChartDrawingAnchor>[...draft.anchors, anchor];
+    if (anchors.length < _requiredAnchorCount(tool)) {
+      setState(() {
+        _draftDrawing = draft.copyWith(anchors: anchors);
+      });
+      return;
+    }
+
+    _createDrawing(anchors, tool);
     setState(() {
       _draftDrawing = null;
       _draftTool = ChartDrawingTool.none;
@@ -847,6 +873,59 @@ class _KChartWidgetState extends State<KChartWidget>
       _lastMainAxisPanPosition = null;
       _activePointerPositions.clear();
       _resetManualPinchState();
+    }
+  }
+
+  Widget? _buildSelectedDrawingOverlay(ChartPainter painter) {
+    final builder = widget.selectedDrawingOverlayBuilder;
+    final selectedId = widget.selectedDrawingId;
+    if (builder == null || selectedId == null) {
+      return null;
+    }
+
+    ChartDrawingEntity? selectedDrawing;
+    for (final drawing in widget.drawings) {
+      if (drawing.id == selectedId) {
+        selectedDrawing = drawing;
+        break;
+      }
+    }
+    if (selectedDrawing == null ||
+        selectedDrawing.hidden ||
+        selectedDrawing.type == ChartDrawingTool.none) {
+      return null;
+    }
+
+    final bounds = painter.drawingBounds(selectedDrawing);
+    if (bounds == null) {
+      return null;
+    }
+
+    return builder(context, selectedDrawing, bounds);
+  }
+
+  void _preparePainterGeometry(ChartPainter painter, Size size) {
+    painter.mDisplayHeight =
+        size.height - painter.mTopPadding - painter.mBottomPadding;
+    painter.mWidth = size.width;
+    painter.initRect(size);
+    painter.calculateValue();
+  }
+
+  int _requiredAnchorCount(ChartDrawingTool tool) {
+    switch (tool) {
+      case ChartDrawingTool.horizontalLine:
+      case ChartDrawingTool.verticalLine:
+        return 1;
+      case ChartDrawingTool.trendLine:
+      case ChartDrawingTool.extendedLine:
+      case ChartDrawingTool.ray:
+      case ChartDrawingTool.rectangle:
+        return 2;
+      case ChartDrawingTool.parallelChannel:
+        return 3;
+      case ChartDrawingTool.none:
+        return 0;
     }
   }
 

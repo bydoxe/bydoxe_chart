@@ -5,7 +5,11 @@ const int chartDrawingSchemaVersion = 1;
 enum ChartDrawingTool {
   none,
   trendLine,
+  extendedLine,
+  ray,
   horizontalLine,
+  verticalLine,
+  parallelChannel,
   rectangle,
 }
 

@@ -102,8 +102,16 @@ class DrawingHitTester {
     switch (drawing.type) {
       case ChartDrawingTool.trendLine:
         return _hitTrendLine(point, drawing);
+      case ChartDrawingTool.extendedLine:
+        return _hitExtendedLine(point, drawing);
+      case ChartDrawingTool.ray:
+        return _hitRay(point, drawing);
       case ChartDrawingTool.horizontalLine:
         return _hitHorizontalLine(point, drawing);
+      case ChartDrawingTool.verticalLine:
+        return _hitVerticalLine(point, drawing);
+      case ChartDrawingTool.parallelChannel:
+        return _hitParallelChannel(point, drawing);
       case ChartDrawingTool.rectangle:
         return _hitRectangle(point, drawing);
       case ChartDrawingTool.none:
@@ -123,12 +131,73 @@ class DrawingHitTester {
     return _distanceToSegment(point, start, end) <= lineTolerance;
   }
 
+  bool _hitExtendedLine(Offset point, ChartDrawingEntity drawing) {
+    if (drawing.anchors.length < 2) {
+      return false;
+    }
+    final start = mapper.anchorToOffset(drawing.anchors[0]);
+    final end = mapper.anchorToOffset(drawing.anchors[1]);
+    if (start == null || end == null) {
+      return false;
+    }
+    return _distanceToLine(point, start, end) <= lineTolerance;
+  }
+
+  bool _hitRay(Offset point, ChartDrawingEntity drawing) {
+    if (drawing.anchors.length < 2) {
+      return false;
+    }
+    final start = mapper.anchorToOffset(drawing.anchors[0]);
+    final end = mapper.anchorToOffset(drawing.anchors[1]);
+    if (start == null || end == null) {
+      return false;
+    }
+    return _isInRayDirection(point, start, end) &&
+        _distanceToLine(point, start, end) <= lineTolerance;
+  }
+
   bool _hitHorizontalLine(Offset point, ChartDrawingEntity drawing) {
     if (drawing.anchors.isEmpty) {
       return false;
     }
     final y = mapper.priceToY(drawing.anchors.first.price);
     return (point.dy - y).abs() <= lineTolerance;
+  }
+
+  bool _hitVerticalLine(Offset point, ChartDrawingEntity drawing) {
+    if (drawing.anchors.isEmpty) {
+      return false;
+    }
+    final x = mapper.anchorToX(drawing.anchors.first);
+    if (x == null) {
+      return false;
+    }
+    return (point.dx - x).abs() <= lineTolerance;
+  }
+
+  bool _hitParallelChannel(Offset point, ChartDrawingEntity drawing) {
+    if (drawing.anchors.length < 2) {
+      return false;
+    }
+    final start = mapper.anchorToOffset(drawing.anchors[0]);
+    final end = mapper.anchorToOffset(drawing.anchors[1]);
+    if (start == null || end == null) {
+      return false;
+    }
+    if (_distanceToSegment(point, start, end) <= lineTolerance) {
+      return true;
+    }
+
+    final third = drawing.anchors.length >= 3
+        ? mapper.anchorToOffset(drawing.anchors[2])
+        : null;
+    if (third == null) {
+      return false;
+    }
+    final parallelEnd = third + (end - start);
+    return _distanceToSegment(point, third, parallelEnd) <= lineTolerance ||
+        _distanceToSegment(point, start, third) <= lineTolerance ||
+        _distanceToSegment(point, end, parallelEnd) <= lineTolerance;
   }
 
   bool _hitRectangle(Offset point, ChartDrawingEntity drawing) {
@@ -161,6 +230,8 @@ class DrawingHitTester {
   List<Offset?> _handleOffsets(ChartDrawingEntity drawing) {
     switch (drawing.type) {
       case ChartDrawingTool.trendLine:
+      case ChartDrawingTool.extendedLine:
+      case ChartDrawingTool.ray:
         return drawing.anchors.take(2).map(mapper.anchorToOffset).toList();
       case ChartDrawingTool.horizontalLine:
         if (drawing.anchors.isEmpty) {
@@ -171,6 +242,20 @@ class DrawingHitTester {
           Offset(mapper.mainPaneClipRect.left, y),
           Offset(mapper.mainPaneClipRect.right, y),
         ];
+      case ChartDrawingTool.verticalLine:
+        if (drawing.anchors.isEmpty) {
+          return const <Offset?>[];
+        }
+        final x = mapper.anchorToX(drawing.anchors.first);
+        if (x == null) {
+          return const <Offset?>[];
+        }
+        return <Offset>[
+          Offset(x, mapper.mainPaneClipRect.top),
+          Offset(x, mapper.mainPaneClipRect.bottom),
+        ];
+      case ChartDrawingTool.parallelChannel:
+        return drawing.anchors.take(3).map(mapper.anchorToOffset).toList();
       case ChartDrawingTool.rectangle:
         if (drawing.anchors.length < 2) {
           return const <Offset?>[];
@@ -209,5 +294,24 @@ class DrawingHitTester {
       start.dy + clampedProjection * dy,
     );
     return (point - closest).distance;
+  }
+
+  double _distanceToLine(Offset point, Offset start, Offset end) {
+    final dx = end.dx - start.dx;
+    final dy = end.dy - start.dy;
+    final length = math.sqrt(dx * dx + dy * dy);
+    if (length == 0) {
+      return (point - start).distance;
+    }
+    return ((point.dx - start.dx) * dy - (point.dy - start.dy) * dx).abs() /
+        length;
+  }
+
+  bool _isInRayDirection(Offset point, Offset start, Offset through) {
+    final direction = through - start;
+    final pointDirection = point - start;
+    return direction.dx * pointDirection.dx +
+            direction.dy * pointDirection.dy >=
+        0;
   }
 }

@@ -283,6 +283,39 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('builds selected drawing overlay from chart bounds',
+      (tester) async {
+    Rect? overlayBounds;
+    await _pumpChart(
+      tester,
+      drawings: const [
+        ChartDrawingEntity(
+          id: 1,
+          type: ChartDrawingTool.trendLine,
+          anchors: [
+            ChartDrawingAnchor(time: 1000, price: 100),
+            ChartDrawingAnchor(time: 1000 + 5 * 60000, price: 106),
+          ],
+        ),
+      ],
+      selectedDrawingId: 1,
+      selectedDrawingOverlayBuilder: (context, drawing, bounds) {
+        overlayBounds = bounds;
+        return const Positioned(
+          left: 0,
+          top: 0,
+          child: SizedBox(key: Key('drawing-overlay'), width: 10, height: 10),
+        );
+      },
+    );
+
+    expect(find.byKey(const Key('drawing-overlay')), findsOneWidget);
+    expect(overlayBounds, isNotNull);
+    expect(overlayBounds!.width, greaterThan(0));
+    expect(overlayBounds!.height, greaterThan(0));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('calls selected drawing callback when drawing is tapped',
       (tester) async {
     int? selectedId;
@@ -404,6 +437,52 @@ void main() {
     expect(changedDrawings, hasLength(1));
     expect(changedDrawings!.single.type, ChartDrawingTool.rectangle);
     expect(changedDrawings!.single.anchors, hasLength(2));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('creates vertical line drawing from one tap', (tester) async {
+    List<ChartDrawingEntity>? changedDrawings;
+    await _pumpChart(
+      tester,
+      drawingEnabled: true,
+      drawingTool: ChartDrawingTool.verticalLine,
+      onDrawingsChanged: (drawings) => changedDrawings = drawings,
+    );
+
+    final painter = _currentChartPainter(tester);
+    await tester
+        .tapAt(Offset(painter.mMainRect.center.dx, painter.getMainY(104)));
+    await tester.pump();
+
+    expect(changedDrawings, hasLength(1));
+    expect(changedDrawings!.single.type, ChartDrawingTool.verticalLine);
+    expect(changedDrawings!.single.anchors, hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('creates parallel channel drawing from three taps',
+      (tester) async {
+    List<ChartDrawingEntity>? changedDrawings;
+    await _pumpChart(
+      tester,
+      drawingEnabled: true,
+      drawingTool: ChartDrawingTool.parallelChannel,
+      onDrawingsChanged: (drawings) => changedDrawings = drawings,
+    );
+
+    final painter = _currentChartPainter(tester);
+    await tester.tapAt(Offset(80, painter.getMainY(102)));
+    await tester.pump();
+    await tester.tapAt(Offset(160, painter.getMainY(106)));
+    await tester.pump();
+    expect(changedDrawings, isNull);
+
+    await tester.tapAt(Offset(80, painter.getMainY(108)));
+    await tester.pump();
+
+    expect(changedDrawings, hasLength(1));
+    expect(changedDrawings!.single.type, ChartDrawingTool.parallelChannel);
+    expect(changedDrawings!.single.anchors, hasLength(3));
     expect(tester.takeException(), isNull);
   });
 
@@ -664,6 +743,7 @@ Future<void> _pumpChart(
   ChartDrawingStyle drawingStyle = const ChartDrawingStyle(),
   ValueChanged<List<ChartDrawingEntity>>? onDrawingsChanged,
   void Function(ChartDrawingEvent event)? onDrawingEvent,
+  ChartDrawingOverlayBuilder? selectedDrawingOverlayBuilder,
 }) async {
   final data = List<KLineEntity>.generate(
     dataCount,
@@ -699,6 +779,7 @@ Future<void> _pumpChart(
           drawingStyle: drawingStyle,
           onDrawingsChanged: onDrawingsChanged,
           onDrawingEvent: onDrawingEvent,
+          selectedDrawingOverlayBuilder: selectedDrawingOverlayBuilder,
           isTrendLine: false,
         ),
       ),

@@ -37,8 +37,20 @@ class DrawingRenderer {
       case ChartDrawingTool.trendLine:
         _drawTrendLine(canvas, drawing);
         break;
+      case ChartDrawingTool.extendedLine:
+        _drawExtendedLine(canvas, drawing);
+        break;
+      case ChartDrawingTool.ray:
+        _drawRay(canvas, drawing);
+        break;
       case ChartDrawingTool.horizontalLine:
         _drawHorizontalLine(canvas, drawing);
+        break;
+      case ChartDrawingTool.verticalLine:
+        _drawVerticalLine(canvas, drawing);
+        break;
+      case ChartDrawingTool.parallelChannel:
+        _drawParallelChannel(canvas, drawing);
         break;
       case ChartDrawingTool.rectangle:
         _drawRectangle(canvas, drawing);
@@ -62,6 +74,48 @@ class DrawingRenderer {
     _drawSelectionHandles(canvas, drawing, [start, end]);
   }
 
+  void _drawExtendedLine(Canvas canvas, ChartDrawingEntity drawing) {
+    if (drawing.anchors.length < 2) {
+      return;
+    }
+    final start = mapper.anchorToOffset(drawing.anchors[0]);
+    final end = mapper.anchorToOffset(drawing.anchors[1]);
+    if (start == null || end == null) {
+      return;
+    }
+
+    final segment = _lineAcrossRect(start, end);
+    if (segment == null) {
+      return;
+    }
+    _drawLine(
+      canvas,
+      segment.$1,
+      segment.$2,
+      _strokePaint(drawing),
+      drawing.style,
+    );
+    _drawSelectionHandles(canvas, drawing, [start, end]);
+  }
+
+  void _drawRay(Canvas canvas, ChartDrawingEntity drawing) {
+    if (drawing.anchors.length < 2) {
+      return;
+    }
+    final start = mapper.anchorToOffset(drawing.anchors[0]);
+    final end = mapper.anchorToOffset(drawing.anchors[1]);
+    if (start == null || end == null) {
+      return;
+    }
+
+    final rayEnd = _rayEndInRect(start, end);
+    if (rayEnd == null) {
+      return;
+    }
+    _drawLine(canvas, start, rayEnd, _strokePaint(drawing), drawing.style);
+    _drawSelectionHandles(canvas, drawing, [start, end]);
+  }
+
   void _drawHorizontalLine(Canvas canvas, ChartDrawingEntity drawing) {
     if (drawing.anchors.isEmpty) {
       return;
@@ -72,6 +126,49 @@ class DrawingRenderer {
 
     _drawLine(canvas, start, end, _strokePaint(drawing), drawing.style);
     _drawSelectionHandles(canvas, drawing, [start, end]);
+  }
+
+  void _drawVerticalLine(Canvas canvas, ChartDrawingEntity drawing) {
+    if (drawing.anchors.isEmpty) {
+      return;
+    }
+    final x = mapper.anchorToX(drawing.anchors.first);
+    if (x == null) {
+      return;
+    }
+    final start = Offset(x, mapper.mainPaneClipRect.top);
+    final end = Offset(x, mapper.mainPaneClipRect.bottom);
+
+    _drawLine(canvas, start, end, _strokePaint(drawing), drawing.style);
+    _drawSelectionHandles(canvas, drawing, [start, end]);
+  }
+
+  void _drawParallelChannel(Canvas canvas, ChartDrawingEntity drawing) {
+    if (drawing.anchors.length < 2) {
+      return;
+    }
+    final start = mapper.anchorToOffset(drawing.anchors[0]);
+    final end = mapper.anchorToOffset(drawing.anchors[1]);
+    if (start == null || end == null) {
+      return;
+    }
+
+    final paint = _strokePaint(drawing);
+    _drawLine(canvas, start, end, paint, drawing.style);
+
+    final third = drawing.anchors.length >= 3
+        ? mapper.anchorToOffset(drawing.anchors[2])
+        : null;
+    if (third == null) {
+      _drawSelectionHandles(canvas, drawing, [start, end]);
+      return;
+    }
+
+    final parallelEnd = third + (end - start);
+    _drawLine(canvas, third, parallelEnd, paint, drawing.style);
+    _drawLine(canvas, start, third, paint, drawing.style);
+    _drawLine(canvas, end, parallelEnd, paint, drawing.style);
+    _drawSelectionHandles(canvas, drawing, [start, end, third]);
   }
 
   void _drawRectangle(Canvas canvas, ChartDrawingEntity drawing) {
@@ -206,5 +303,70 @@ class DrawingRenderer {
     final pattern =
         style.dashPattern?.where((value) => value > 0).toList(growable: false);
     return pattern == null || pattern.isEmpty ? null : pattern;
+  }
+
+  (Offset, Offset)? _lineAcrossRect(Offset start, Offset end) {
+    final points = _lineRectIntersections(start, end);
+    if (points.length < 2) {
+      return null;
+    }
+    return (points.first, points.last);
+  }
+
+  Offset? _rayEndInRect(Offset start, Offset through) {
+    final points = _lineRectIntersections(start, through);
+    if (points.isEmpty) {
+      return null;
+    }
+
+    final direction = through - start;
+    Offset? best;
+    var bestProjection = 0.0;
+    for (final point in points) {
+      final projection = (point.dx - start.dx) * direction.dx +
+          (point.dy - start.dy) * direction.dy;
+      if (projection >= 0 && (best == null || projection > bestProjection)) {
+        best = point;
+        bestProjection = projection;
+      }
+    }
+    return best;
+  }
+
+  List<Offset> _lineRectIntersections(Offset start, Offset end) {
+    final rect = mapper.mainPaneClipRect;
+    final dx = end.dx - start.dx;
+    final dy = end.dy - start.dy;
+    if (dx == 0 && dy == 0) {
+      return const <Offset>[];
+    }
+
+    final points = <Offset>[];
+    void addIfValid(double t) {
+      final point = Offset(start.dx + dx * t, start.dy + dy * t);
+      if (point.dx >= rect.left - 0.01 &&
+          point.dx <= rect.right + 0.01 &&
+          point.dy >= rect.top - 0.01 &&
+          point.dy <= rect.bottom + 0.01 &&
+          !points.any((existing) => (existing - point).distance < 0.01)) {
+        points.add(point);
+      }
+    }
+
+    if (dx != 0) {
+      addIfValid((rect.left - start.dx) / dx);
+      addIfValid((rect.right - start.dx) / dx);
+    }
+    if (dy != 0) {
+      addIfValid((rect.top - start.dy) / dy);
+      addIfValid((rect.bottom - start.dy) / dy);
+    }
+
+    points.sort((a, b) {
+      final da = (a - start).distanceSquared;
+      final db = (b - start).distanceSquared;
+      return da.compareTo(db);
+    });
+    return points;
   }
 }
