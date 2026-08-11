@@ -214,6 +214,17 @@ class _KChartWidgetState extends State<KChartWidget>
   ChartDrawingTool _draftTool = ChartDrawingTool.none;
   DrawingDragSession? _drawingDragSession;
 
+  @override
+  void didUpdateWidget(covariant KChartWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.drawingEnabled ||
+        widget.drawingTool == ChartDrawingTool.none ||
+        widget.drawingTool != oldWidget.drawingTool) {
+      _draftDrawing = null;
+      _draftTool = ChartDrawingTool.none;
+    }
+  }
+
   double getMinScrollX() {
     return mScaleX;
   }
