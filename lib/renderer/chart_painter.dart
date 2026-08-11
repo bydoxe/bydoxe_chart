@@ -422,6 +422,22 @@ class ChartPainter extends BaseChartPainter {
     ).hitTest(point);
   }
 
+  ChartDrawingAnchor? drawingAnchorAt(Offset point) {
+    if (datas == null || datas!.isEmpty || !mMainRect.contains(point)) {
+      return null;
+    }
+    final mapper = _drawingCoordinateMapper();
+    final time = mapper.timeAtX(point.dx);
+    if (time == null) {
+      return null;
+    }
+    return ChartDrawingAnchor(
+      time: time,
+      price: mapper.yToPrice(point.dy),
+      dataIndex: mapper.nearestDataIndexForX(point.dx),
+    );
+  }
+
   ChartCoordinateMapper _drawingCoordinateMapper() {
     return ChartCoordinateMapper(
       datas: datas!,

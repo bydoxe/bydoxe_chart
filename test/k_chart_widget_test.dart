@@ -342,6 +342,191 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('creates horizontal line drawing from one tap', (tester) async {
+    List<ChartDrawingEntity>? changedDrawings;
+    await _pumpChart(
+      tester,
+      drawingEnabled: true,
+      drawingTool: ChartDrawingTool.horizontalLine,
+      onDrawingsChanged: (drawings) => changedDrawings = drawings,
+    );
+
+    final painter = _currentChartPainter(tester);
+    await tester
+        .tapAt(Offset(painter.mMainRect.center.dx, painter.getMainY(104)));
+    await tester.pump();
+
+    expect(changedDrawings, hasLength(1));
+    expect(changedDrawings!.single.type, ChartDrawingTool.horizontalLine);
+    expect(changedDrawings!.single.anchors, hasLength(1));
+    expect(changedDrawings!.single.anchors.single.price, closeTo(104, 0.05));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('creates trend line drawing from two taps', (tester) async {
+    List<ChartDrawingEntity>? changedDrawings;
+    await _pumpChart(
+      tester,
+      drawingEnabled: true,
+      drawingTool: ChartDrawingTool.trendLine,
+      onDrawingsChanged: (drawings) => changedDrawings = drawings,
+    );
+
+    final painter = _currentChartPainter(tester);
+    await tester.tapAt(Offset(80, painter.getMainY(102)));
+    await tester.pump();
+    expect(changedDrawings, isNull);
+
+    await tester.tapAt(Offset(160, painter.getMainY(106)));
+    await tester.pump();
+
+    expect(changedDrawings, hasLength(1));
+    expect(changedDrawings!.single.type, ChartDrawingTool.trendLine);
+    expect(changedDrawings!.single.anchors, hasLength(2));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('creates rectangle drawing from two taps', (tester) async {
+    List<ChartDrawingEntity>? changedDrawings;
+    await _pumpChart(
+      tester,
+      drawingEnabled: true,
+      drawingTool: ChartDrawingTool.rectangle,
+      onDrawingsChanged: (drawings) => changedDrawings = drawings,
+    );
+
+    final painter = _currentChartPainter(tester);
+    await tester.tapAt(Offset(80, painter.getMainY(102)));
+    await tester.pump();
+    await tester.tapAt(Offset(160, painter.getMainY(106)));
+    await tester.pump();
+
+    expect(changedDrawings, hasLength(1));
+    expect(changedDrawings!.single.type, ChartDrawingTool.rectangle);
+    expect(changedDrawings!.single.anchors, hasLength(2));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('selected handle drag updates drawing anchor', (tester) async {
+    List<ChartDrawingEntity>? changedDrawings;
+    const drawing = ChartDrawingEntity(
+      id: 7,
+      type: ChartDrawingTool.trendLine,
+      anchors: [
+        ChartDrawingAnchor(time: 1000 + 6 * 60000, price: 104),
+        ChartDrawingAnchor(time: 1000 + 7 * 60000, price: 106),
+      ],
+    );
+    await _pumpChart(
+      tester,
+      drawings: const [drawing],
+      selectedDrawingId: 7,
+      drawingSelectionEnabled: true,
+      onDrawingsChanged: (drawings) => changedDrawings = drawings,
+    );
+
+    final painter = _currentChartPainter(tester);
+    await tester.dragFrom(
+      Offset(65, painter.getMainY(104)),
+      const Offset(20, -20),
+    );
+    await tester.pump();
+
+    expect(changedDrawings, hasLength(1));
+    final updated = changedDrawings!.single;
+    expect(updated.anchors.first.time, isNot(drawing.anchors.first.time));
+    expect(
+        updated.anchors.first.price, greaterThan(drawing.anchors.first.price));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('selected body drag moves all drawing anchors', (tester) async {
+    List<ChartDrawingEntity>? changedDrawings;
+    const drawing = ChartDrawingEntity(
+      id: 8,
+      type: ChartDrawingTool.trendLine,
+      anchors: [
+        ChartDrawingAnchor(time: 1000 + 6 * 60000, price: 104),
+        ChartDrawingAnchor(time: 1000 + 7 * 60000, price: 106),
+      ],
+    );
+    await _pumpChart(
+      tester,
+      drawings: const [drawing],
+      selectedDrawingId: 8,
+      drawingSelectionEnabled: true,
+      onDrawingsChanged: (drawings) => changedDrawings = drawings,
+    );
+
+    final painter = _currentChartPainter(tester);
+    await tester.dragFrom(
+      Offset(70, painter.getMainY(105)),
+      const Offset(20, -20),
+    );
+    await tester.pump();
+
+    expect(changedDrawings, hasLength(1));
+    final updated = changedDrawings!.single;
+    expect(updated.anchors.first.time, isNot(drawing.anchors.first.time));
+    expect(updated.anchors.last.time, isNot(drawing.anchors.last.time));
+    expect(
+        updated.anchors.first.price, greaterThan(drawing.anchors.first.price));
+    expect(updated.anchors.last.price, greaterThan(drawing.anchors.last.price));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('two finger pinch still zooms while drawing mode is on',
+      (tester) async {
+    await _pumpChart(
+      tester,
+      dataCount: 80,
+      drawingEnabled: true,
+      drawingTool: ChartDrawingTool.trendLine,
+      onDrawingsChanged: (_) {},
+    );
+
+    await _pinchWithPointers(
+      tester,
+      startA: const Offset(130, 210),
+      startB: const Offset(190, 210),
+      endA: const Offset(90, 210),
+      endB: const Offset(230, 210),
+    );
+
+    expect(_currentScaleX(tester), greaterThan(1.0));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('locked drawing does not move', (tester) async {
+    List<ChartDrawingEntity>? changedDrawings;
+    const drawing = ChartDrawingEntity(
+      id: 9,
+      type: ChartDrawingTool.trendLine,
+      anchors: [
+        ChartDrawingAnchor(time: 1000 + 6 * 60000, price: 104),
+        ChartDrawingAnchor(time: 1000 + 7 * 60000, price: 106),
+      ],
+      locked: true,
+    );
+    await _pumpChart(
+      tester,
+      drawings: const [drawing],
+      selectedDrawingId: 9,
+      drawingSelectionEnabled: true,
+      onDrawingsChanged: (drawings) => changedDrawings = drawings,
+    );
+
+    final painter = _currentChartPainter(tester);
+    await tester.dragFrom(
+      Offset(65, painter.getMainY(104)),
+      const Offset(20, -20),
+    );
+    await tester.pump();
+
+    expect(changedDrawings, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('manual pinch zoom works after pan reset and axis readjustment',
       (tester) async {
     await _pumpChart(tester, dataCount: 80);
@@ -474,6 +659,11 @@ Future<void> _pumpChart(
   int? selectedDrawingId,
   bool drawingSelectionEnabled = false,
   ValueChanged<int?>? onSelectedDrawingChanged,
+  bool drawingEnabled = false,
+  ChartDrawingTool drawingTool = ChartDrawingTool.none,
+  ChartDrawingStyle drawingStyle = const ChartDrawingStyle(),
+  ValueChanged<List<ChartDrawingEntity>>? onDrawingsChanged,
+  void Function(ChartDrawingEvent event)? onDrawingEvent,
 }) async {
   final data = List<KLineEntity>.generate(
     dataCount,
@@ -504,6 +694,11 @@ Future<void> _pumpChart(
           selectedDrawingId: selectedDrawingId,
           drawingSelectionEnabled: drawingSelectionEnabled,
           onSelectedDrawingChanged: onSelectedDrawingChanged,
+          drawingEnabled: drawingEnabled,
+          drawingTool: drawingTool,
+          drawingStyle: drawingStyle,
+          onDrawingsChanged: onDrawingsChanged,
+          onDrawingEvent: onDrawingEvent,
           isTrendLine: false,
         ),
       ),

@@ -76,6 +76,11 @@ class KChartWidget extends StatefulWidget {
   final bool showDrawings;
   final bool drawingSelectionEnabled;
   final ValueChanged<int?>? onSelectedDrawingChanged;
+  final ChartDrawingTool drawingTool;
+  final ChartDrawingStyle drawingStyle;
+  final bool drawingEnabled;
+  final ValueChanged<List<ChartDrawingEntity>>? onDrawingsChanged;
+  final void Function(ChartDrawingEvent event)? onDrawingEvent;
   final bool isTrendLine;
   final double xFrontPadding;
   final List<IndicatorMA>? indicatorMA;
@@ -129,6 +134,11 @@ class KChartWidget extends StatefulWidget {
     this.showDrawings = true,
     this.drawingSelectionEnabled = false,
     this.onSelectedDrawingChanged,
+    this.drawingTool = ChartDrawingTool.none,
+    this.drawingStyle = const ChartDrawingStyle(),
+    this.drawingEnabled = false,
+    this.onDrawingsChanged,
+    this.onDrawingEvent,
     this.mBaseHeight = 360,
     this.indicatorMA,
     this.indicatorEMA,
@@ -192,6 +202,9 @@ class _KChartWidgetState extends State<KChartWidget>
   double mSelectY = 0.0;
   bool waitingForOtherPairOfCords = false;
   bool enableCordRecord = false;
+  ChartDrawingEntity? _draftDrawing;
+  ChartDrawingTool _draftTool = ChartDrawingTool.none;
+  DrawingDragSession? _drawingDragSession;
 
   double getMinScrollX() {
     return mScaleX;
@@ -265,6 +278,7 @@ class _KChartWidgetState extends State<KChartWidget>
       secondaryStateLi: widget.secondaryStateLi,
       mainStateLi: widget.mainStateLi,
     );
+    final displayDrawings = _displayDrawings();
     final _painter = ChartPainter(
       widget.chartStyle,
       widget.chartColors,
@@ -296,7 +310,7 @@ class _KChartWidgetState extends State<KChartWidget>
       positionLines: widget.positionLines,
       positionLabelAlignment: widget.positionLabelAlignment,
       markers: widget.markers,
-      drawings: widget.drawings,
+      drawings: displayDrawings,
       selectedDrawingId: widget.selectedDrawingId,
       showDrawings: widget.showDrawings,
       activePositionId: activePositionId,
@@ -325,11 +339,15 @@ class _KChartWidgetState extends State<KChartWidget>
             _activePointerIds.add(event.pointer);
             _activePointerPositions[event.pointer] = event.localPosition;
             if (_activePointerIds.length >= 2) {
-              if (!_mainAxisAutoScale) {
+              if (_isDrawingInputActive || !_mainAxisAutoScale) {
                 _beginManualPinch(baseDimension);
               } else {
                 _prepareForScaleGesture();
               }
+              return;
+            }
+            if (_activePointerIds.length == 1 &&
+                _beginDrawingDragIfNeeded(event.localPosition, _painter)) {
               return;
             }
             if (_activePointerIds.length == 1 &&
@@ -342,6 +360,10 @@ class _KChartWidgetState extends State<KChartWidget>
             _activePointerPositions[event.pointer] = event.localPosition;
             if (_manualPinchActive) {
               _updateManualPinch(baseDimension);
+              return;
+            }
+            if (_drawingDragSession != null) {
+              _updateDrawingDrag(event.localPosition, _painter);
               return;
             }
             if (event.pointer != _mainAxisPanPointer ||
@@ -365,6 +387,9 @@ class _KChartWidgetState extends State<KChartWidget>
               if (!widget.isTrendLine &&
                   _painter.isInMainRect(details.localPosition)) {
                 isOnTap = true;
+                if (_handleDrawingTap(details.localPosition, _painter)) {
+                  return;
+                }
                 // hit test position chips/buttons first
                 final hit =
                     _hitTestPosition(details.localPosition, _painter) ?? false;
@@ -438,10 +463,12 @@ class _KChartWidgetState extends State<KChartWidget>
               }
             },
             onHorizontalDragDown: (details) {
+              if (_isDrawingInputActive) return;
               isOnTap = false;
               _stopAnimation();
             },
             onHorizontalDragUpdate: (details) {
+              if (_isDrawingInputActive) return;
               if (isScale || isLongPress) return;
               if (!isDrag) {
                 _onDragChanged(true);
@@ -452,11 +479,17 @@ class _KChartWidgetState extends State<KChartWidget>
               notifyChanged();
             },
             onHorizontalDragEnd: (DragEndDetails details) {
+              if (_isDrawingInputActive) return;
               var velocity = details.velocity.pixelsPerSecond.dx;
               _onFling(velocity);
             },
             onHorizontalDragCancel: () => _onDragChanged(false),
             onScaleStart: (details) {
+              if (_isDrawingInputActive &&
+                  details.pointerCount <= 1 &&
+                  _activePointerIds.length < 2) {
+                return;
+              }
               isScale = true;
               _scaleStartScaleX = mScaleX;
               _scaleStartScrollX = mScrollX;
@@ -476,6 +509,11 @@ class _KChartWidgetState extends State<KChartWidget>
                     );
             },
             onScaleUpdate: (details) {
+              if (_isDrawingInputActive &&
+                  details.pointerCount <= 1 &&
+                  _activePointerIds.length < 2) {
+                return;
+              }
               if (_manualPinchActive && !_mainAxisAutoScale) return;
               final bool isManualAxisZoom = !_mainAxisAutoScale &&
                   (details.pointerCount > 1 ||
@@ -533,6 +571,7 @@ class _KChartWidgetState extends State<KChartWidget>
               _scaleStartMainAxisAnchor = null;
             },
             onLongPressStart: (details) {
+              if (_isDrawingInputActive) return;
               isOnTap = false;
               isLongPress = true;
               if ((mSelectX != details.localPosition.dx ||
@@ -555,6 +594,7 @@ class _KChartWidgetState extends State<KChartWidget>
               }
             },
             onLongPressMoveUpdate: (details) {
+              if (_isDrawingInputActive) return;
               if ((mSelectX != details.localPosition.dx ||
                       mSelectY != details.globalPosition.dy) &&
                   !widget.isTrendLine) {
@@ -573,6 +613,7 @@ class _KChartWidgetState extends State<KChartWidget>
               }
             },
             onLongPressEnd: (details) {
+              if (_isDrawingInputActive) return;
               isLongPress = false;
               enableCordRecord = true;
               mInfoWindowStream.sink.add(null);
@@ -593,6 +634,182 @@ class _KChartWidgetState extends State<KChartWidget>
           ),
         );
       },
+    );
+  }
+
+  List<ChartDrawingEntity> _displayDrawings() {
+    final draft = _draftDrawing;
+    if (draft == null || !widget.drawingEnabled) {
+      return widget.drawings;
+    }
+    return <ChartDrawingEntity>[
+      ...widget.drawings,
+      draft,
+    ];
+  }
+
+  bool get _isDrawingInputActive =>
+      (widget.drawingEnabled && widget.drawingTool != ChartDrawingTool.none) ||
+      _drawingDragSession != null;
+
+  bool _handleDrawingTap(Offset position, ChartPainter painter) {
+    if (!widget.drawingEnabled ||
+        widget.drawingTool == ChartDrawingTool.none ||
+        widget.onDrawingsChanged == null) {
+      return false;
+    }
+
+    final anchor = painter.drawingAnchorAt(position);
+    if (anchor == null) {
+      return true;
+    }
+
+    switch (widget.drawingTool) {
+      case ChartDrawingTool.horizontalLine:
+        _createDrawing([anchor], widget.drawingTool);
+        return true;
+      case ChartDrawingTool.trendLine:
+      case ChartDrawingTool.rectangle:
+        _handleTwoAnchorDrawingTap(anchor, widget.drawingTool);
+        return true;
+      case ChartDrawingTool.none:
+        return false;
+    }
+  }
+
+  void _handleTwoAnchorDrawingTap(
+    ChartDrawingAnchor anchor,
+    ChartDrawingTool tool,
+  ) {
+    final draft = _draftDrawing;
+    if (draft == null || _draftTool != tool) {
+      setState(() {
+        _draftTool = tool;
+        _draftDrawing = DrawingController.createDrawing(
+          id: -1,
+          tool: tool,
+          anchors: <ChartDrawingAnchor>[anchor, anchor],
+          style: widget.drawingStyle,
+        );
+      });
+      widget.onDrawingEvent?.call(
+        ChartDrawingEvent(
+          type: ChartDrawingEventType.createStarted,
+          drawing: _draftDrawing,
+        ),
+      );
+      return;
+    }
+
+    _createDrawing(<ChartDrawingAnchor>[draft.anchors.first, anchor], tool);
+    setState(() {
+      _draftDrawing = null;
+      _draftTool = ChartDrawingTool.none;
+    });
+  }
+
+  void _createDrawing(
+    List<ChartDrawingAnchor> anchors,
+    ChartDrawingTool tool,
+  ) {
+    final drawing = DrawingController.createDrawing(
+      id: DrawingController.nextDrawingId(widget.drawings),
+      tool: tool,
+      anchors: anchors,
+      style: widget.drawingStyle,
+    );
+    final drawings = DrawingController.appendDrawing(widget.drawings, drawing);
+    widget.onDrawingsChanged?.call(drawings);
+    widget.onSelectedDrawingChanged?.call(drawing.id);
+    widget.onDrawingEvent?.call(
+      ChartDrawingEvent(
+        type: ChartDrawingEventType.created,
+        drawing: drawing,
+        drawingId: drawing.id,
+      ),
+    );
+  }
+
+  bool _beginDrawingDragIfNeeded(Offset position, ChartPainter painter) {
+    if (_isDrawingInputActive ||
+        !widget.drawingSelectionEnabled ||
+        widget.onDrawingsChanged == null) {
+      return false;
+    }
+
+    final hit = painter.hitTestDrawing(position);
+    if (hit == null) {
+      return false;
+    }
+
+    final drawing =
+        DrawingController.drawingById(widget.drawings, hit.drawingId);
+    final startAnchor = painter.drawingAnchorAt(position);
+    if (drawing == null || drawing.locked || startAnchor == null) {
+      return false;
+    }
+
+    _drawingDragSession = DrawingDragSession(
+      drawingId: hit.drawingId,
+      kind: hit.kind,
+      handleIndex: hit.handleIndex,
+      startPoint: position,
+      startAnchor: startAnchor,
+      startDrawings: widget.drawings,
+    );
+    _stopAnimation(needNotify: false);
+    _clearLongPressState();
+    return true;
+  }
+
+  void _updateDrawingDrag(Offset position, ChartPainter painter) {
+    final session = _drawingDragSession;
+    if (session == null || widget.onDrawingsChanged == null) {
+      return;
+    }
+
+    final currentAnchor = painter.drawingAnchorAt(position);
+    if (currentAnchor == null) {
+      return;
+    }
+
+    final drawing = DrawingController.drawingById(
+      session.startDrawings,
+      session.drawingId,
+    );
+    if (drawing == null || drawing.locked) {
+      return;
+    }
+
+    final ChartDrawingEntity updated;
+    switch (session.kind) {
+      case DrawingHitTestKind.handle:
+        updated = DrawingController.replaceAnchor(
+          drawing: drawing,
+          handleIndex: session.handleIndex ?? 0,
+          anchor: currentAnchor,
+        );
+        break;
+      case DrawingHitTestKind.body:
+        updated = DrawingController.moveDrawing(
+          drawing: drawing,
+          deltaTime: currentAnchor.time - session.startAnchor.time,
+          deltaPrice: currentAnchor.price - session.startAnchor.price,
+        );
+        break;
+    }
+
+    final drawings = DrawingController.updateDrawing(
+      session.startDrawings,
+      updated,
+    );
+    widget.onDrawingsChanged?.call(drawings);
+    widget.onDrawingEvent?.call(
+      ChartDrawingEvent(
+        type: ChartDrawingEventType.updated,
+        drawing: updated,
+        drawingId: updated.id,
+      ),
     );
   }
 
@@ -617,6 +834,9 @@ class _KChartWidgetState extends State<KChartWidget>
     if (_mainAxisPanPointer == pointer) {
       _mainAxisPanPointer = null;
       _lastMainAxisPanPosition = null;
+    }
+    if (_drawingDragSession != null) {
+      _drawingDragSession = null;
     }
     if (_manualPinchActive && _activePointerPositions.length < 2) {
       isScale = false;
@@ -652,8 +872,7 @@ class _KChartWidgetState extends State<KChartWidget>
     final startRange = _manualPinchStartRange;
     if (points == null ||
         startRange == null ||
-        _manualPinchStartDistance <= 0 ||
-        _mainAxisAutoScale) {
+        _manualPinchStartDistance <= 0) {
       return;
     }
 
@@ -672,7 +891,9 @@ class _KChartWidgetState extends State<KChartWidget>
     );
 
     final double verticalDistance = (points.$1.dy - points.$2.dy).abs();
-    if (_manualPinchStartVerticalDistance > 0 && verticalDistance > 0) {
+    if (!_mainAxisAutoScale &&
+        _manualPinchStartVerticalDistance > 0 &&
+        verticalDistance > 0) {
       final double verticalScale =
           verticalDistance / _manualPinchStartVerticalDistance;
       final double anchorValue =
