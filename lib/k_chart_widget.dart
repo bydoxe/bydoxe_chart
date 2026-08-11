@@ -74,6 +74,8 @@ class KChartWidget extends StatefulWidget {
   final List<ChartDrawingEntity> drawings;
   final int? selectedDrawingId;
   final bool showDrawings;
+  final bool drawingSelectionEnabled;
+  final ValueChanged<int?>? onSelectedDrawingChanged;
   final bool isTrendLine;
   final double xFrontPadding;
   final List<IndicatorMA>? indicatorMA;
@@ -125,6 +127,8 @@ class KChartWidget extends StatefulWidget {
     this.drawings = const <ChartDrawingEntity>[],
     this.selectedDrawingId,
     this.showDrawings = true,
+    this.drawingSelectionEnabled = false,
+    this.onSelectedDrawingChanged,
     this.mBaseHeight = 360,
     this.indicatorMA,
     this.indicatorEMA,
@@ -364,6 +368,15 @@ class _KChartWidgetState extends State<KChartWidget>
                 // hit test position chips/buttons first
                 final hit =
                     _hitTestPosition(details.localPosition, _painter) ?? false;
+                if (!hit && widget.drawingSelectionEnabled) {
+                  final drawingHit =
+                      _painter.hitTestDrawing(details.localPosition);
+                  if (drawingHit != null) {
+                    widget.onSelectedDrawingChanged?.call(drawingHit.drawingId);
+                    return;
+                  }
+                  widget.onSelectedDrawingChanged?.call(null);
+                }
                 // if not hit on position elements, check now price chip when pinned
                 if (!hit && _painter.nowPricePinned == true) {
                   final Rect? chipRect = _painter.nowPriceChipRect;

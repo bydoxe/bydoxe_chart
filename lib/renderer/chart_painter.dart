@@ -7,6 +7,7 @@ import 'package:bydoxe_chart/utils/price_label_util.dart';
 import '../entity/info_window_entity.dart';
 import '../entity/drawing_entity.dart';
 import '../entity/k_line_entity.dart';
+import '../interaction/drawing_hit_test.dart';
 import '../utils/date_format_util.dart';
 import 'base_chart_painter.dart';
 import 'chart_coordinate_mapper.dart';
@@ -404,19 +405,34 @@ class ChartPainter extends BaseChartPainter {
     }
 
     DrawingRenderer(
-      mapper: ChartCoordinateMapper(
-        datas: datas!,
-        mainRect: mMainRect,
-        scaleX: scaleX,
-        scrollX: scrollX,
-        pointWidth: mPointWidth,
-        xFrontPadding: xFrontPadding,
-        mainMaxValue: mMainMaxValue,
-        mainMinValue: mMainMinValue,
-      ),
+      mapper: _drawingCoordinateMapper(),
       drawings: drawings,
       selectedDrawingId: selectedDrawingId,
     ).draw(canvas);
+  }
+
+  DrawingHitTestResult? hitTestDrawing(Offset point) {
+    if (!showDrawings || drawings.isEmpty || datas == null || datas!.isEmpty) {
+      return null;
+    }
+    return DrawingHitTester(
+      mapper: _drawingCoordinateMapper(),
+      drawings: drawings,
+      selectedDrawingId: selectedDrawingId,
+    ).hitTest(point);
+  }
+
+  ChartCoordinateMapper _drawingCoordinateMapper() {
+    return ChartCoordinateMapper(
+      datas: datas!,
+      mainRect: mMainRect,
+      scaleX: scaleX,
+      scrollX: scrollX,
+      pointWidth: mPointWidth,
+      xFrontPadding: xFrontPadding,
+      mainMaxValue: mMainMaxValue,
+      mainMinValue: mMainMinValue,
+    );
   }
 
   void _drawTransformedInRect(

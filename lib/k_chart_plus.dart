@@ -6,5 +6,6 @@ export 'depth_chart.dart';
 
 export 'utils/index.dart'; //数据加工
 export 'entity/index.dart'; //数据
+export 'interaction/index.dart';
 export 'renderer/index.dart';
 export 'extension/num_ext.dart';

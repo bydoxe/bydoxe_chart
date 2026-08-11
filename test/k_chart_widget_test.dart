@@ -283,6 +283,65 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('calls selected drawing callback when drawing is tapped',
+      (tester) async {
+    int? selectedId;
+    await _pumpChart(
+      tester,
+      drawings: const [
+        ChartDrawingEntity(
+          id: 11,
+          type: ChartDrawingTool.horizontalLine,
+          anchors: [
+            ChartDrawingAnchor(time: 1000, price: 104),
+          ],
+        ),
+      ],
+      drawingSelectionEnabled: true,
+      onSelectedDrawingChanged: (id) => selectedId = id,
+    );
+
+    final painter = _currentChartPainter(tester);
+    await tester
+        .tapAt(Offset(painter.mMainRect.center.dx, painter.getMainY(104)));
+    await tester.pump();
+
+    expect(selectedId, 11);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('calls selected drawing callback with null for empty tap',
+      (tester) async {
+    var callbackCalled = false;
+    int? selectedId = 99;
+    await _pumpChart(
+      tester,
+      drawings: const [
+        ChartDrawingEntity(
+          id: 11,
+          type: ChartDrawingTool.horizontalLine,
+          anchors: [
+            ChartDrawingAnchor(time: 1000, price: 104),
+          ],
+        ),
+      ],
+      drawingSelectionEnabled: true,
+      onSelectedDrawingChanged: (id) {
+        callbackCalled = true;
+        selectedId = id;
+      },
+    );
+
+    final painter = _currentChartPainter(tester);
+    await tester
+        .tapAt(Offset(painter.mMainRect.center.dx, painter.getMainY(110)));
+    await tester.pump();
+
+    expect(callbackCalled, isTrue);
+    expect(selectedId, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('manual pinch zoom works after pan reset and axis readjustment',
       (tester) async {
     await _pumpChart(tester, dataCount: 80);
@@ -413,6 +472,8 @@ Future<void> _pumpChart(
   List<PositionMarkerEntity> markers = const <PositionMarkerEntity>[],
   List<ChartDrawingEntity> drawings = const <ChartDrawingEntity>[],
   int? selectedDrawingId,
+  bool drawingSelectionEnabled = false,
+  ValueChanged<int?>? onSelectedDrawingChanged,
 }) async {
   final data = List<KLineEntity>.generate(
     dataCount,
@@ -441,6 +502,8 @@ Future<void> _pumpChart(
           markers: markers,
           drawings: drawings,
           selectedDrawingId: selectedDrawingId,
+          drawingSelectionEnabled: drawingSelectionEnabled,
+          onSelectedDrawingChanged: onSelectedDrawingChanged,
           isTrendLine: false,
         ),
       ),
