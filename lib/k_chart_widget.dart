@@ -71,6 +71,9 @@ class KChartWidget extends StatefulWidget {
   final PositionLabelAlignment positionLabelAlignment;
   final void Function(int id, PositionAction action)? onPositionAction;
   final List<PositionMarkerEntity> markers;
+  final List<ChartDrawingEntity> drawings;
+  final int? selectedDrawingId;
+  final bool showDrawings;
   final bool isTrendLine;
   final double xFrontPadding;
   final List<IndicatorMA>? indicatorMA;
@@ -119,6 +122,9 @@ class KChartWidget extends StatefulWidget {
     this.positionLabelAlignment = PositionLabelAlignment.left,
     this.onPositionAction,
     this.markers = const <PositionMarkerEntity>[],
+    this.drawings = const <ChartDrawingEntity>[],
+    this.selectedDrawingId,
+    this.showDrawings = true,
     this.mBaseHeight = 360,
     this.indicatorMA,
     this.indicatorEMA,
@@ -286,6 +292,9 @@ class _KChartWidgetState extends State<KChartWidget>
       positionLines: widget.positionLines,
       positionLabelAlignment: widget.positionLabelAlignment,
       markers: widget.markers,
+      drawings: widget.drawings,
+      selectedDrawingId: widget.selectedDrawingId,
+      showDrawings: widget.showDrawings,
       activePositionId: activePositionId,
       mainAxisRangeOverride: _mainAxisAutoScale ? null : _mainAxisRangeOverride,
       indicatorMA: widget.indicatorMA,

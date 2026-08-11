@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:bydoxe_chart/utils/number_util.dart';
 import 'package:bydoxe_chart/utils/price_label_util.dart';
 import '../entity/info_window_entity.dart';
+import '../entity/drawing_entity.dart';
 import '../entity/k_line_entity.dart';
 import '../utils/date_format_util.dart';
 import 'base_chart_painter.dart';
+import 'chart_coordinate_mapper.dart';
+import 'drawing_renderer.dart';
 import '../entity/position_line_entity.dart';
 import 'base_chart_renderer.dart';
 import 'base_dimension.dart';
@@ -73,6 +76,9 @@ class ChartPainter extends BaseChartPainter {
   final List<PositionLineEntity> positionLines;
   final PositionLabelAlignment positionLabelAlignment;
   final List<PositionMarkerEntity> markers;
+  final List<ChartDrawingEntity> drawings;
+  final int? selectedDrawingId;
+  final bool showDrawings;
   int? activePositionId;
   final List<IndicatorMA>? indicatorMA;
   final List<IndicatorEMA>? indicatorEMA;
@@ -123,6 +129,9 @@ class ChartPainter extends BaseChartPainter {
     required this.positionLines,
     required this.positionLabelAlignment,
     required this.markers,
+    this.drawings = const <ChartDrawingEntity>[],
+    this.selectedDrawingId,
+    this.showDrawings = true,
     this.activePositionId,
     this.indicatorMA,
     this.indicatorEMA,
@@ -332,6 +341,7 @@ class ChartPainter extends BaseChartPainter {
         mMainRenderer.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
       }
     });
+    _drawDrawings(canvas);
     _drawMarkers(canvas);
 
     final volRenderer = mVolRenderer;
@@ -386,6 +396,27 @@ class ChartPainter extends BaseChartPainter {
       _drawMarkerForCandle(canvas, curX, i, curPoint);
     }
     canvas.restore();
+  }
+
+  void _drawDrawings(Canvas canvas) {
+    if (!showDrawings || drawings.isEmpty || datas == null || datas!.isEmpty) {
+      return;
+    }
+
+    DrawingRenderer(
+      mapper: ChartCoordinateMapper(
+        datas: datas!,
+        mainRect: mMainRect,
+        scaleX: scaleX,
+        scrollX: scrollX,
+        pointWidth: mPointWidth,
+        xFrontPadding: xFrontPadding,
+        mainMaxValue: mMainMaxValue,
+        mainMinValue: mMainMinValue,
+      ),
+      drawings: drawings,
+      selectedDrawingId: selectedDrawingId,
+    ).draw(canvas);
   }
 
   void _drawTransformedInRect(

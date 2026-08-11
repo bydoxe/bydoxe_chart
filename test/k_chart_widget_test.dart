@@ -245,6 +245,44 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('builds with display-only chart drawings', (tester) async {
+    await _pumpChart(
+      tester,
+      drawings: const [
+        ChartDrawingEntity(
+          id: 1,
+          type: ChartDrawingTool.trendLine,
+          anchors: [
+            ChartDrawingAnchor(time: 1000, price: 100),
+            ChartDrawingAnchor(time: 1000 + 5 * 60000, price: 106),
+          ],
+          style: ChartDrawingStyle(strokeWidth: 2),
+        ),
+        ChartDrawingEntity(
+          id: 2,
+          type: ChartDrawingTool.horizontalLine,
+          anchors: [
+            ChartDrawingAnchor(time: 1000, price: 104),
+          ],
+        ),
+        ChartDrawingEntity(
+          id: 3,
+          type: ChartDrawingTool.rectangle,
+          anchors: [
+            ChartDrawingAnchor(time: 1000 + 2 * 60000, price: 102),
+            ChartDrawingAnchor(time: 1000 + 6 * 60000, price: 108),
+          ],
+          style: ChartDrawingStyle(fillColor: Color(0x22123456)),
+        ),
+      ],
+      selectedDrawingId: 1,
+    );
+
+    expect(_currentChartPainter(tester).drawings, hasLength(3));
+    expect(_currentChartPainter(tester).selectedDrawingId, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('manual pinch zoom works after pan reset and axis readjustment',
       (tester) async {
     await _pumpChart(tester, dataCount: 80);
@@ -373,6 +411,8 @@ Future<void> _pumpChart(
   ChartColors? chartColors,
   int dataCount = 8,
   List<PositionMarkerEntity> markers = const <PositionMarkerEntity>[],
+  List<ChartDrawingEntity> drawings = const <ChartDrawingEntity>[],
+  int? selectedDrawingId,
 }) async {
   final data = List<KLineEntity>.generate(
     dataCount,
@@ -399,6 +439,8 @@ Future<void> _pumpChart(
           mainStateLi: const {MainState.MA},
           verticalTextAlignment: verticalTextAlignment,
           markers: markers,
+          drawings: drawings,
+          selectedDrawingId: selectedDrawingId,
           isTrendLine: false,
         ),
       ),
