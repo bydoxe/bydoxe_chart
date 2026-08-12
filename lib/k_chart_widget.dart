@@ -949,6 +949,7 @@ class _KChartWidgetState extends State<KChartWidget>
       return false;
     }
 
+    widget.onSelectedDrawingChanged?.call(drawing.id);
     _drawingDragSession = DrawingDragSession(
       drawingId: hit.drawingId,
       kind: hit.kind,
