@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:bydoxe_chart/chart_translations.dart';
@@ -91,6 +92,7 @@ class KChartWidget extends StatefulWidget {
   final ValueChanged<List<ChartDrawingEntity>>? onDrawingsChanged;
   final void Function(ChartDrawingEvent event)? onDrawingEvent;
   final ChartDrawingOverlayBuilder? selectedDrawingOverlayBuilder;
+  final ValueListenable<bool>? inputBlockedListenable;
   final bool isTrendLine;
   final double xFrontPadding;
   final List<IndicatorMA>? indicatorMA;
@@ -152,6 +154,7 @@ class KChartWidget extends StatefulWidget {
     this.onDrawingsChanged,
     this.onDrawingEvent,
     this.selectedDrawingOverlayBuilder,
+    this.inputBlockedListenable,
     this.mBaseHeight = 360,
     this.indicatorMA,
     this.indicatorEMA,
@@ -372,6 +375,7 @@ class _KChartWidgetState extends State<KChartWidget>
         return Listener(
           behavior: HitTestBehavior.translucent,
           onPointerDown: (event) {
+            if (_isInputBlocked) return;
             _activePointerIds.add(event.pointer);
             _activePointerPositions[event.pointer] = event.localPosition;
             if (_activePointerIds.length >= 2) {
@@ -400,6 +404,7 @@ class _KChartWidgetState extends State<KChartWidget>
             }
           },
           onPointerMove: (event) {
+            if (_isInputBlocked) return;
             _activePointerPositions[event.pointer] = event.localPosition;
             if (_manualPinchActive) {
               _updateManualPinch(baseDimension);
@@ -430,18 +435,28 @@ class _KChartWidgetState extends State<KChartWidget>
             _panMainAxisByDistance(event.localPosition.dy - previous.dy);
           },
           onPointerHover: (event) {
+            if (_isInputBlocked) return;
             _updateDraftPreviewIfNeeded(event.localPosition, _painter);
           },
           onPointerUp: (event) {
+            if (_isInputBlocked) {
+              _finishPointerTracking(event.pointer);
+              return;
+            }
             _finishDraftPreviewPointerIfNeeded(event.pointer);
             _finishPointerTracking(event.pointer);
           },
           onPointerCancel: (event) {
+            if (_isInputBlocked) {
+              _finishPointerTracking(event.pointer);
+              return;
+            }
             _clearDraftPreviewPointer(event.pointer);
             _finishPointerTracking(event.pointer);
           },
           child: GestureDetector(
             onTapUp: (details) {
+              if (_isInputBlocked) return;
               // if (!widget.isTrendLine && widget.onSecondaryTap != null && _painter.isInSecondaryRect(details.localPosition)) {
               //   widget.onSecondaryTap!();
               // }
@@ -525,11 +540,13 @@ class _KChartWidgetState extends State<KChartWidget>
               }
             },
             onHorizontalDragDown: (details) {
+              if (_isInputBlocked) return;
               if (_isDrawingInputActive) return;
               isOnTap = false;
               _stopAnimation();
             },
             onHorizontalDragUpdate: (details) {
+              if (_isInputBlocked) return;
               if (_isDrawingInputActive) return;
               if (isScale || isLongPress) return;
               if (!isDrag) {
@@ -541,12 +558,17 @@ class _KChartWidgetState extends State<KChartWidget>
               notifyChanged();
             },
             onHorizontalDragEnd: (DragEndDetails details) {
+              if (_isInputBlocked) return;
               if (_isDrawingInputActive) return;
               var velocity = details.velocity.pixelsPerSecond.dx;
               _onFling(velocity);
             },
-            onHorizontalDragCancel: () => _onDragChanged(false),
+            onHorizontalDragCancel: () {
+              if (_isInputBlocked) return;
+              _onDragChanged(false);
+            },
             onScaleStart: (details) {
+              if (_isInputBlocked) return;
               if (_isDrawingInputActive &&
                   details.pointerCount <= 1 &&
                   _activePointerIds.length < 2) {
@@ -571,6 +593,7 @@ class _KChartWidgetState extends State<KChartWidget>
                     );
             },
             onScaleUpdate: (details) {
+              if (_isInputBlocked) return;
               if (_isDrawingInputActive &&
                   details.pointerCount <= 1 &&
                   _activePointerIds.length < 2) {
@@ -628,11 +651,13 @@ class _KChartWidgetState extends State<KChartWidget>
               notifyChanged();
             },
             onScaleEnd: (_) {
+              if (_isInputBlocked) return;
               isScale = false;
               _scaleStartMainAxisRange = null;
               _scaleStartMainAxisAnchor = null;
             },
             onLongPressStart: (details) {
+              if (_isInputBlocked) return;
               if (_isDrawingInputActive) return;
               isOnTap = false;
               isLongPress = true;
@@ -656,6 +681,7 @@ class _KChartWidgetState extends State<KChartWidget>
               }
             },
             onLongPressMoveUpdate: (details) {
+              if (_isInputBlocked) return;
               if (_isDrawingInputActive) return;
               if ((mSelectX != details.localPosition.dx ||
                       mSelectY != details.globalPosition.dy) &&
@@ -675,6 +701,7 @@ class _KChartWidgetState extends State<KChartWidget>
               }
             },
             onLongPressEnd: (details) {
+              if (_isInputBlocked) return;
               if (_isDrawingInputActive) return;
               isLongPress = false;
               enableCordRecord = true;
@@ -733,6 +760,8 @@ class _KChartWidgetState extends State<KChartWidget>
   bool get _isDrawingInputActive =>
       (widget.drawingEnabled && widget.drawingTool != ChartDrawingTool.none) ||
       _drawingDragSession != null;
+
+  bool get _isInputBlocked => widget.inputBlockedListenable?.value == true;
 
   bool _handleDrawingTap(Offset position, ChartPainter painter) {
     if (!widget.drawingEnabled ||
