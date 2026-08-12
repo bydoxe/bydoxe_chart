@@ -789,6 +789,8 @@ class _KChartWidgetState extends State<KChartWidget>
       case ChartDrawingTool.ray:
       case ChartDrawingTool.rectangle:
       case ChartDrawingTool.fibonacciRetracement:
+      case ChartDrawingTool.thirdWave:
+      case ChartDrawingTool.fifthWave:
       case ChartDrawingTool.parallelChannel:
         _handleMultiAnchorDrawingTap(anchor, widget.drawingTool);
         return true;
@@ -1135,6 +1137,10 @@ class _KChartWidgetState extends State<KChartWidget>
         return 2;
       case ChartDrawingTool.parallelChannel:
         return 3;
+      case ChartDrawingTool.thirdWave:
+        return 4;
+      case ChartDrawingTool.fifthWave:
+        return 6;
       case ChartDrawingTool.none:
         return 0;
     }

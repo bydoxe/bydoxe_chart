@@ -114,6 +114,9 @@ class DrawingHitTester {
         return _hitParallelChannel(point, drawing);
       case ChartDrawingTool.fibonacciRetracement:
         return _hitFibonacciRetracement(point, drawing);
+      case ChartDrawingTool.thirdWave:
+      case ChartDrawingTool.fifthWave:
+        return _hitWave(point, drawing);
       case ChartDrawingTool.rectangle:
         return _hitRectangle(point, drawing);
       case ChartDrawingTool.none:
@@ -228,6 +231,26 @@ class DrawingHitTester {
     return false;
   }
 
+  bool _hitWave(Offset point, ChartDrawingEntity drawing) {
+    if (drawing.anchors.length < 2) {
+      return false;
+    }
+    final points = drawing.anchors
+        .map(mapper.anchorToOffset)
+        .whereType<Offset>()
+        .toList(growable: false);
+    if (points.length < 2) {
+      return false;
+    }
+    for (var i = 0; i < points.length - 1; i += 1) {
+      if (_distanceToSegment(point, points[i], points[i + 1]) <=
+          lineTolerance) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   bool _hitRectangle(Offset point, ChartDrawingEntity drawing) {
     if (drawing.anchors.length < 2) {
       return false;
@@ -268,6 +291,10 @@ class DrawingHitTester {
         return drawing.anchors.take(3).map(mapper.anchorToOffset).toList();
       case ChartDrawingTool.fibonacciRetracement:
         return drawing.anchors.take(2).map(mapper.anchorToOffset).toList();
+      case ChartDrawingTool.thirdWave:
+        return drawing.anchors.take(4).map(mapper.anchorToOffset).toList();
+      case ChartDrawingTool.fifthWave:
+        return drawing.anchors.take(6).map(mapper.anchorToOffset).toList();
       case ChartDrawingTool.rectangle:
         if (drawing.anchors.length < 2) {
           return const <Offset?>[];

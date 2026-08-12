@@ -23,6 +23,8 @@ enum ChartDrawingTool {
   verticalLine,
   parallelChannel,
   fibonacciRetracement,
+  thirdWave,
+  fifthWave,
   rectangle,
 }
 

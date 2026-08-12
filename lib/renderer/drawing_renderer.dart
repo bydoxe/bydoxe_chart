@@ -58,6 +58,10 @@ class DrawingRenderer {
       case ChartDrawingTool.fibonacciRetracement:
         _drawFibonacciRetracement(canvas, drawing);
         break;
+      case ChartDrawingTool.thirdWave:
+      case ChartDrawingTool.fifthWave:
+        _drawWave(canvas, drawing);
+        break;
       case ChartDrawingTool.rectangle:
         _drawRectangle(canvas, drawing);
         break;
@@ -228,6 +232,25 @@ class DrawingRenderer {
     _drawSelectionHandles(canvas, drawing, [start, end]);
   }
 
+  void _drawWave(Canvas canvas, ChartDrawingEntity drawing) {
+    if (drawing.anchors.isEmpty) {
+      return;
+    }
+    final points = _anchorOffsets(drawing.anchors);
+    if (points.isEmpty) {
+      return;
+    }
+
+    if (points.length >= 2) {
+      final paint = _strokePaint(drawing);
+      for (var i = 0; i < points.length - 1; i += 1) {
+        _drawLine(canvas, points[i], points[i + 1], paint, drawing.style);
+      }
+    }
+    _drawWaveLabels(canvas, drawing, points);
+    _drawSelectionHandles(canvas, drawing, points);
+  }
+
   void _drawRectangle(Canvas canvas, ChartDrawingEntity drawing) {
     if (drawing.anchors.length < 2) {
       _drawSelectionHandles(canvas, drawing, _anchorOffsets(drawing.anchors));
@@ -304,6 +327,45 @@ class DrawingRenderer {
     final start = drawing.anchors[0].price;
     final end = drawing.anchors[1].price;
     return start + (end - start) * level;
+  }
+
+  void _drawWaveLabels(
+    Canvas canvas,
+    ChartDrawingEntity drawing,
+    List<Offset> points,
+  ) {
+    if (points.length < 2 || drawing.id < 0) {
+      return;
+    }
+    final color = drawing.style.color;
+    for (var i = 1; i < points.length; i += 1) {
+      final label = i.toString();
+      final painter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: TextStyle(
+            color: color,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final point = points[i];
+      final dx = (point.dx + 4)
+          .clamp(
+            mapper.mainPaneClipRect.left,
+            mapper.mainPaneClipRect.right - painter.width,
+          )
+          .toDouble();
+      final dy = (point.dy - painter.height - 4)
+          .clamp(
+            mapper.mainPaneClipRect.top,
+            mapper.mainPaneClipRect.bottom - painter.height,
+          )
+          .toDouble();
+      painter.paint(canvas, Offset(dx, dy));
+    }
   }
 
   void _drawRectOutline(

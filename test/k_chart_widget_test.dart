@@ -469,6 +469,66 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('creates third wave drawing from four taps', (tester) async {
+    List<ChartDrawingEntity>? changedDrawings;
+    await _pumpChart(
+      tester,
+      drawingEnabled: true,
+      drawingTool: ChartDrawingTool.thirdWave,
+      onDrawingsChanged: (drawings) => changedDrawings = drawings,
+    );
+
+    final painter = _currentChartPainter(tester);
+    await tester.tapAt(Offset(80, painter.getMainY(102)));
+    await tester.pump();
+    await tester.tapAt(Offset(120, painter.getMainY(106)));
+    await tester.pump();
+    await tester.tapAt(Offset(160, painter.getMainY(103)));
+    await tester.pump();
+    expect(changedDrawings, isNull);
+
+    await tester.tapAt(Offset(200, painter.getMainY(108)));
+    await tester.pump();
+
+    expect(changedDrawings, hasLength(1));
+    expect(changedDrawings!.single.type, ChartDrawingTool.thirdWave);
+    expect(changedDrawings!.single.anchors, hasLength(4));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('creates fifth wave drawing from six taps', (tester) async {
+    List<ChartDrawingEntity>? changedDrawings;
+    await _pumpChart(
+      tester,
+      drawingEnabled: true,
+      drawingTool: ChartDrawingTool.fifthWave,
+      onDrawingsChanged: (drawings) => changedDrawings = drawings,
+    );
+
+    final painter = _currentChartPainter(tester);
+    final points = <Offset>[
+      Offset(80, painter.getMainY(102)),
+      Offset(110, painter.getMainY(106)),
+      Offset(140, painter.getMainY(103)),
+      Offset(170, painter.getMainY(108)),
+      Offset(200, painter.getMainY(105)),
+      Offset(230, painter.getMainY(110)),
+    ];
+    for (var i = 0; i < points.length - 1; i += 1) {
+      await tester.tapAt(points[i]);
+      await tester.pump();
+    }
+    expect(changedDrawings, isNull);
+
+    await tester.tapAt(points.last);
+    await tester.pump();
+
+    expect(changedDrawings, hasLength(1));
+    expect(changedDrawings!.single.type, ChartDrawingTool.fifthWave);
+    expect(changedDrawings!.single.anchors, hasLength(6));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('creates vertical line drawing from one tap', (tester) async {
     List<ChartDrawingEntity>? changedDrawings;
     await _pumpChart(

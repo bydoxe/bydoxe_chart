@@ -475,6 +475,10 @@ class ChartPainter extends BaseChartPainter {
         return _boundsFromOffsets(points);
       case ChartDrawingTool.fibonacciRetracement:
         return _boundsFromAnchors(mapper, drawing.anchors.take(2));
+      case ChartDrawingTool.thirdWave:
+        return _boundsFromAnchors(mapper, drawing.anchors.take(4));
+      case ChartDrawingTool.fifthWave:
+        return _boundsFromAnchors(mapper, drawing.anchors.take(6));
       case ChartDrawingTool.rectangle:
         return _boundsFromAnchors(mapper, drawing.anchors.take(2));
       case ChartDrawingTool.none:
@@ -1329,6 +1333,10 @@ class ChartPainter extends BaseChartPainter {
         return drawing.anchors.take(2).toList(growable: false);
       case ChartDrawingTool.parallelChannel:
         return drawing.anchors.take(3).toList(growable: false);
+      case ChartDrawingTool.thirdWave:
+        return drawing.anchors.take(4).toList(growable: false);
+      case ChartDrawingTool.fifthWave:
+        return drawing.anchors.take(6).toList(growable: false);
       case ChartDrawingTool.none:
         return const <ChartDrawingAnchor>[];
     }
