@@ -184,7 +184,7 @@ class DrawingHitTester {
     if (start == null || end == null) {
       return false;
     }
-    if (_distanceToSegment(point, start, end) <= lineTolerance) {
+    if (_distanceToLine(point, start, end) <= lineTolerance) {
       return true;
     }
 
@@ -195,9 +195,7 @@ class DrawingHitTester {
       return false;
     }
     final parallelEnd = third + (end - start);
-    return _distanceToSegment(point, third, parallelEnd) <= lineTolerance ||
-        _distanceToSegment(point, start, third) <= lineTolerance ||
-        _distanceToSegment(point, end, parallelEnd) <= lineTolerance;
+    return _distanceToLine(point, third, parallelEnd) <= lineTolerance;
   }
 
   bool _hitRectangle(Offset point, ChartDrawingEntity drawing) {

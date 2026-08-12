@@ -163,7 +163,12 @@ class DrawingRenderer {
     }
 
     final paint = _strokePaint(drawing);
-    _drawLine(canvas, start, end, paint, drawing.style);
+    final baseSegment = _lineAcrossRect(start, end);
+    if (baseSegment == null) {
+      _drawSelectionHandles(canvas, drawing, [start, end]);
+      return;
+    }
+    _drawLine(canvas, baseSegment.$1, baseSegment.$2, paint, drawing.style);
 
     final third = drawing.anchors.length >= 3
         ? mapper.anchorToOffset(drawing.anchors[2])
@@ -174,9 +179,16 @@ class DrawingRenderer {
     }
 
     final parallelEnd = third + (end - start);
-    _drawLine(canvas, third, parallelEnd, paint, drawing.style);
-    _drawLine(canvas, start, third, paint, drawing.style);
-    _drawLine(canvas, end, parallelEnd, paint, drawing.style);
+    final parallelSegment = _lineAcrossRect(third, parallelEnd);
+    if (parallelSegment != null) {
+      _drawLine(
+        canvas,
+        parallelSegment.$1,
+        parallelSegment.$2,
+        paint,
+        drawing.style,
+      );
+    }
     _drawSelectionHandles(canvas, drawing, [start, end, third]);
   }
 
