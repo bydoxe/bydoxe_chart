@@ -6,6 +6,9 @@ import '../entity/drawing_entity.dart';
 import 'chart_coordinate_mapper.dart';
 
 class DrawingRenderer {
+  static const Color _anchorFillColor = Color(0xff3f8cff);
+  static const Color _anchorStrokeColor = Color(0xff9bc7ff);
+
   final ChartCoordinateMapper mapper;
   final List<ChartDrawingEntity> drawings;
   final int? selectedDrawingId;
@@ -62,6 +65,7 @@ class DrawingRenderer {
 
   void _drawTrendLine(Canvas canvas, ChartDrawingEntity drawing) {
     if (drawing.anchors.length < 2) {
+      _drawSelectionHandles(canvas, drawing, _anchorOffsets(drawing.anchors));
       return;
     }
     final start = mapper.anchorToOffset(drawing.anchors[0]);
@@ -76,6 +80,7 @@ class DrawingRenderer {
 
   void _drawExtendedLine(Canvas canvas, ChartDrawingEntity drawing) {
     if (drawing.anchors.length < 2) {
+      _drawSelectionHandles(canvas, drawing, _anchorOffsets(drawing.anchors));
       return;
     }
     final start = mapper.anchorToOffset(drawing.anchors[0]);
@@ -100,6 +105,7 @@ class DrawingRenderer {
 
   void _drawRay(Canvas canvas, ChartDrawingEntity drawing) {
     if (drawing.anchors.length < 2) {
+      _drawSelectionHandles(canvas, drawing, _anchorOffsets(drawing.anchors));
       return;
     }
     final start = mapper.anchorToOffset(drawing.anchors[0]);
@@ -145,6 +151,7 @@ class DrawingRenderer {
 
   void _drawParallelChannel(Canvas canvas, ChartDrawingEntity drawing) {
     if (drawing.anchors.length < 2) {
+      _drawSelectionHandles(canvas, drawing, _anchorOffsets(drawing.anchors));
       return;
     }
     final start = mapper.anchorToOffset(drawing.anchors[0]);
@@ -173,6 +180,7 @@ class DrawingRenderer {
 
   void _drawRectangle(Canvas canvas, ChartDrawingEntity drawing) {
     if (drawing.anchors.length < 2) {
+      _drawSelectionHandles(canvas, drawing, _anchorOffsets(drawing.anchors));
       return;
     }
     final start = mapper.anchorToOffset(drawing.anchors[0]);
@@ -203,7 +211,7 @@ class DrawingRenderer {
   }
 
   Paint _strokePaint(ChartDrawingEntity drawing) {
-    final isSelected = drawing.id == selectedDrawingId;
+    final isSelected = drawing.id == selectedDrawingId || drawing.id < 0;
     return Paint()
       ..isAntiAlias = true
       ..style = PaintingStyle.stroke
@@ -218,27 +226,31 @@ class DrawingRenderer {
     ChartDrawingEntity drawing,
     List<Offset> points,
   ) {
-    if (drawing.id != selectedDrawingId) {
+    if (drawing.id != selectedDrawingId && drawing.id >= 0) {
       return;
     }
 
     final fillPaint = Paint()
       ..isAntiAlias = true
       ..style = PaintingStyle.fill
-      ..color = Colors.white;
+      ..color = _anchorFillColor;
     final strokePaint = Paint()
       ..isAntiAlias = true
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5
-      ..color = drawing.style.color;
+      ..color = _anchorStrokeColor;
 
     for (final point in points) {
       if (!mapper.isOffsetVisible(point)) {
         continue;
       }
-      canvas.drawCircle(point, 4.0, fillPaint);
-      canvas.drawCircle(point, 4.0, strokePaint);
+      canvas.drawCircle(point, 5.0, fillPaint);
+      canvas.drawCircle(point, 5.0, strokePaint);
     }
+  }
+
+  List<Offset> _anchorOffsets(Iterable<ChartDrawingAnchor> anchors) {
+    return anchors.map(mapper.anchorToOffset).whereType<Offset>().toList();
   }
 
   void _drawRectOutline(

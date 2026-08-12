@@ -216,6 +216,10 @@ class _KChartWidgetState extends State<KChartWidget>
   bool enableCordRecord = false;
   ChartDrawingEntity? _draftDrawing;
   ChartDrawingTool _draftTool = ChartDrawingTool.none;
+  ChartDrawingAnchor? _draftPreviewAnchor;
+  int? _draftPreviewPointer;
+  Offset? _draftPreviewPointerDownPosition;
+  bool _draftPreviewPointerMoved = false;
   DrawingDragSession? _drawingDragSession;
 
   @override
@@ -226,6 +230,10 @@ class _KChartWidgetState extends State<KChartWidget>
         widget.drawingTool != oldWidget.drawingTool) {
       _draftDrawing = null;
       _draftTool = ChartDrawingTool.none;
+      _draftPreviewAnchor = null;
+      _draftPreviewPointer = null;
+      _draftPreviewPointerDownPosition = null;
+      _draftPreviewPointerMoved = false;
     }
   }
 
@@ -373,6 +381,13 @@ class _KChartWidgetState extends State<KChartWidget>
               }
               return;
             }
+            if (_beginDraftPreviewPointer(
+              event.pointer,
+              event.localPosition,
+              _painter,
+            )) {
+              return;
+            }
             if (_activePointerIds.length == 1 &&
                 _beginDrawingDragIfNeeded(event.localPosition, _painter)) {
               return;
@@ -393,6 +408,16 @@ class _KChartWidgetState extends State<KChartWidget>
               _updateDrawingDrag(event.localPosition, _painter);
               return;
             }
+            if (_updateDraftPreviewPointerMove(
+              event.pointer,
+              event.localPosition,
+              _painter,
+            )) {
+              return;
+            }
+            if (_updateDraftPreviewIfNeeded(event.localPosition, _painter)) {
+              return;
+            }
             if (event.pointer != _mainAxisPanPointer ||
                 _activePointerIds.length != 1 ||
                 isLongPress) {
@@ -403,8 +428,17 @@ class _KChartWidgetState extends State<KChartWidget>
             if (previous == null) return;
             _panMainAxisByDistance(event.localPosition.dy - previous.dy);
           },
-          onPointerUp: (event) => _finishPointerTracking(event.pointer),
-          onPointerCancel: (event) => _finishPointerTracking(event.pointer),
+          onPointerHover: (event) {
+            _updateDraftPreviewIfNeeded(event.localPosition, _painter);
+          },
+          onPointerUp: (event) {
+            _finishDraftPreviewPointerIfNeeded(event.pointer);
+            _finishPointerTracking(event.pointer);
+          },
+          onPointerCancel: (event) {
+            _clearDraftPreviewPointer(event.pointer);
+            _finishPointerTracking(event.pointer);
+          },
           child: GestureDetector(
             onTapUp: (details) {
               // if (!widget.isTrendLine && widget.onSecondaryTap != null && _painter.isInSecondaryRect(details.localPosition)) {
@@ -673,8 +707,26 @@ class _KChartWidgetState extends State<KChartWidget>
     }
     return <ChartDrawingEntity>[
       ...widget.drawings,
-      draft,
+      _draftWithPreviewAnchor(draft),
     ];
+  }
+
+  ChartDrawingEntity _draftWithPreviewAnchor(ChartDrawingEntity draft) {
+    final previewAnchor = _draftPreviewAnchor;
+    if (previewAnchor == null ||
+        _draftTool == ChartDrawingTool.none ||
+        draft.anchors.length >= _requiredAnchorCount(_draftTool) ||
+        (draft.anchors.isNotEmpty &&
+            _sameDrawingAnchor(draft.anchors.last, previewAnchor))) {
+      return draft;
+    }
+
+    return draft.copyWith(
+      anchors: <ChartDrawingAnchor>[
+        ...draft.anchors,
+        previewAnchor,
+      ],
+    );
   }
 
   bool get _isDrawingInputActive =>
@@ -729,6 +781,7 @@ class _KChartWidgetState extends State<KChartWidget>
           style: widget.drawingStyle,
           locked: widget.drawingDefaultLocked,
         );
+        _draftPreviewAnchor = anchor;
       });
       widget.onDrawingEvent?.call(
         ChartDrawingEvent(
@@ -743,6 +796,7 @@ class _KChartWidgetState extends State<KChartWidget>
     if (anchors.length < _requiredAnchorCount(tool)) {
       setState(() {
         _draftDrawing = draft.copyWith(anchors: anchors);
+        _draftPreviewAnchor = anchor;
       });
       return;
     }
@@ -751,7 +805,102 @@ class _KChartWidgetState extends State<KChartWidget>
     setState(() {
       _draftDrawing = null;
       _draftTool = ChartDrawingTool.none;
+      _draftPreviewAnchor = null;
     });
+  }
+
+  bool _updateDraftPreviewIfNeeded(Offset position, ChartPainter painter) {
+    final draft = _draftDrawing;
+    if (!widget.drawingEnabled ||
+        draft == null ||
+        _draftTool == ChartDrawingTool.none ||
+        draft.anchors.length >= _requiredAnchorCount(_draftTool)) {
+      return false;
+    }
+
+    final anchor = painter.drawingAnchorAt(
+      position,
+      tool: _draftTool,
+      magnetEnabled: widget.drawingMagnetEnabled,
+    );
+    if (anchor == null || _sameDrawingAnchor(anchor, _draftPreviewAnchor)) {
+      return true;
+    }
+
+    setState(() {
+      _draftPreviewAnchor = anchor;
+    });
+    return true;
+  }
+
+  bool _beginDraftPreviewPointer(
+    int pointer,
+    Offset position,
+    ChartPainter painter,
+  ) {
+    if (_draftDrawing == null ||
+        _draftTool == ChartDrawingTool.none ||
+        !_updateDraftPreviewIfNeeded(position, painter)) {
+      return false;
+    }
+
+    _draftPreviewPointer = pointer;
+    _draftPreviewPointerDownPosition = position;
+    _draftPreviewPointerMoved = false;
+    return true;
+  }
+
+  bool _updateDraftPreviewPointerMove(
+    int pointer,
+    Offset position,
+    ChartPainter painter,
+  ) {
+    if (_draftPreviewPointer != pointer) {
+      return false;
+    }
+
+    final downPosition = _draftPreviewPointerDownPosition;
+    if (downPosition != null && (position - downPosition).distance > 2.0) {
+      _draftPreviewPointerMoved = true;
+    }
+    _updateDraftPreviewIfNeeded(position, painter);
+    return true;
+  }
+
+  void _finishDraftPreviewPointerIfNeeded(int pointer) {
+    if (_draftPreviewPointer != pointer) {
+      return;
+    }
+
+    final anchor = _draftPreviewAnchor;
+    final tool = _draftTool;
+    final lastAnchor = _draftDrawing?.anchors.isEmpty == false
+        ? _draftDrawing!.anchors.last
+        : null;
+    final shouldCommit = _draftPreviewPointerMoved &&
+        anchor != null &&
+        tool != ChartDrawingTool.none &&
+        !_sameDrawingAnchor(lastAnchor, anchor);
+    _clearDraftPreviewPointer(pointer);
+    if (shouldCommit) {
+      _handleMultiAnchorDrawingTap(anchor, tool);
+    }
+  }
+
+  void _clearDraftPreviewPointer(int pointer) {
+    if (_draftPreviewPointer != pointer) {
+      return;
+    }
+
+    _draftPreviewPointer = null;
+    _draftPreviewPointerDownPosition = null;
+    _draftPreviewPointerMoved = false;
+  }
+
+  bool _sameDrawingAnchor(ChartDrawingAnchor? a, ChartDrawingAnchor? b) {
+    return a?.time == b?.time &&
+        a?.price == b?.price &&
+        a?.dataIndex == b?.dataIndex;
   }
 
   void _createDrawing(
