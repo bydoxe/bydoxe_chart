@@ -234,26 +234,8 @@ class DrawingHitTester {
       case ChartDrawingTool.ray:
         return drawing.anchors.take(2).map(mapper.anchorToOffset).toList();
       case ChartDrawingTool.horizontalLine:
-        if (drawing.anchors.isEmpty) {
-          return const <Offset?>[];
-        }
-        final y = mapper.priceToY(drawing.anchors.first.price);
-        return <Offset>[
-          Offset(mapper.mainPaneClipRect.left, y),
-          Offset(mapper.mainPaneClipRect.right, y),
-        ];
       case ChartDrawingTool.verticalLine:
-        if (drawing.anchors.isEmpty) {
-          return const <Offset?>[];
-        }
-        final x = mapper.anchorToX(drawing.anchors.first);
-        if (x == null) {
-          return const <Offset?>[];
-        }
-        return <Offset>[
-          Offset(x, mapper.mainPaneClipRect.top),
-          Offset(x, mapper.mainPaneClipRect.bottom),
-        ];
+        return drawing.anchors.take(1).map(mapper.anchorToOffset).toList();
       case ChartDrawingTool.parallelChannel:
         return drawing.anchors.take(3).map(mapper.anchorToOffset).toList();
       case ChartDrawingTool.rectangle:

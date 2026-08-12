@@ -526,20 +526,12 @@ class ChartPainter extends BaseChartPainter {
     final price = (highY - point.dy).abs() <= (lowY - point.dy).abs()
         ? entity.high
         : entity.low;
-    final snapTime = tool != ChartDrawingTool.horizontalLine;
-    final snapPrice = tool != ChartDrawingTool.verticalLine;
 
-    var snappedAnchor = anchor;
-    if (snapTime) {
-      snappedAnchor = snappedAnchor.copyWith(
-        time: time,
-        dataIndex: nearestIndex,
-      );
-    }
-    if (snapPrice) {
-      snappedAnchor = snappedAnchor.copyWith(price: price);
-    }
-    return snappedAnchor;
+    return anchor.copyWith(
+      time: time,
+      price: price,
+      dataIndex: nearestIndex,
+    );
   }
 
   ChartCoordinateMapper _drawingCoordinateMapper() {
@@ -1299,12 +1291,8 @@ class ChartPainter extends BaseChartPainter {
 
     final mapper = _drawingCoordinateMapper();
     final color = selectedDrawing.style.color;
-    if (selectedDrawing.type != ChartDrawingTool.verticalLine) {
-      _drawDrawingPriceAxisRange(canvas, anchors, color, mapper);
-    }
-    if (selectedDrawing.type != ChartDrawingTool.horizontalLine) {
-      _drawDrawingTimeAxisRange(canvas, size, anchors, color, mapper);
-    }
+    _drawDrawingPriceAxisRange(canvas, anchors, color, mapper);
+    _drawDrawingTimeAxisRange(canvas, size, anchors, color, mapper);
   }
 
   List<ChartDrawingAnchor> _drawingAxisAnchors(ChartDrawingEntity drawing) {

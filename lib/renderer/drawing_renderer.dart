@@ -131,7 +131,8 @@ class DrawingRenderer {
     final end = Offset(mapper.mainPaneClipRect.right, y);
 
     _drawLine(canvas, start, end, _strokePaint(drawing), drawing.style);
-    _drawSelectionHandles(canvas, drawing, [start, end]);
+    _drawSelectionHandles(
+        canvas, drawing, _anchorOffsets(drawing.anchors.take(1)));
   }
 
   void _drawVerticalLine(Canvas canvas, ChartDrawingEntity drawing) {
@@ -146,7 +147,8 @@ class DrawingRenderer {
     final end = Offset(x, mapper.mainPaneClipRect.bottom);
 
     _drawLine(canvas, start, end, _strokePaint(drawing), drawing.style);
-    _drawSelectionHandles(canvas, drawing, [start, end]);
+    _drawSelectionHandles(
+        canvas, drawing, _anchorOffsets(drawing.anchors.take(1)));
   }
 
   void _drawParallelChannel(Canvas canvas, ChartDrawingEntity drawing) {
