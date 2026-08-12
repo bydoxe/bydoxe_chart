@@ -211,13 +211,10 @@ class DrawingRenderer {
   }
 
   Paint _strokePaint(ChartDrawingEntity drawing) {
-    final isSelected = drawing.id == selectedDrawingId || drawing.id < 0;
     return Paint()
       ..isAntiAlias = true
       ..style = PaintingStyle.stroke
-      ..strokeWidth = isSelected
-          ? drawing.style.strokeWidth + 1.0
-          : drawing.style.strokeWidth
+      ..strokeWidth = drawing.style.strokeWidth
       ..color = drawing.style.color;
   }
 

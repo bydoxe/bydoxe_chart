@@ -3,6 +3,8 @@ import 'package:flutter/material.dart' show Color;
 const int chartDrawingSchemaVersion = 1;
 const Color kChartDrawingDefaultColor = Color(0xff26c6da);
 const Color kChartDrawingLegacyDefaultColor = Color(0xfff89215);
+const double kChartDrawingDefaultStrokeWidth = 2.0;
+const double kChartDrawingLegacyDefaultStrokeWidth = 1.0;
 
 enum ChartDrawingTool {
   none,
@@ -63,7 +65,7 @@ class ChartDrawingStyle {
 
   const ChartDrawingStyle({
     this.color = kChartDrawingDefaultColor,
-    this.strokeWidth = 1.0,
+    this.strokeWidth = kChartDrawingDefaultStrokeWidth,
     this.fillColor,
     this.dashPattern,
   });
@@ -81,7 +83,8 @@ class ChartDrawingStyle {
       color: Color(
         _readInt(json['color']) ?? kChartDrawingDefaultColor.toARGB32(),
       ),
-      strokeWidth: _readDouble(json['strokeWidth']) ?? 1.0,
+      strokeWidth:
+          _readDouble(json['strokeWidth']) ?? kChartDrawingDefaultStrokeWidth,
       fillColor: _readInt(json['fillColor']) == null
           ? null
           : Color(_readInt(json['fillColor'])!),
