@@ -788,6 +788,7 @@ class _KChartWidgetState extends State<KChartWidget>
       case ChartDrawingTool.extendedLine:
       case ChartDrawingTool.ray:
       case ChartDrawingTool.rectangle:
+      case ChartDrawingTool.fibonacciRetracement:
       case ChartDrawingTool.parallelChannel:
         _handleMultiAnchorDrawingTap(anchor, widget.drawingTool);
         return true;
@@ -1130,6 +1131,7 @@ class _KChartWidgetState extends State<KChartWidget>
       case ChartDrawingTool.extendedLine:
       case ChartDrawingTool.ray:
       case ChartDrawingTool.rectangle:
+      case ChartDrawingTool.fibonacciRetracement:
         return 2;
       case ChartDrawingTool.parallelChannel:
         return 3;

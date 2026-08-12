@@ -5,6 +5,14 @@ const Color kChartDrawingDefaultColor = Color(0xff26c6da);
 const Color kChartDrawingLegacyDefaultColor = Color(0xfff89215);
 const double kChartDrawingDefaultStrokeWidth = 2.0;
 const double kChartDrawingLegacyDefaultStrokeWidth = 1.0;
+const List<double> chartDrawingFibonacciLevels = <double>[
+  0,
+  0.236,
+  0.382,
+  0.5,
+  0.618,
+  1,
+];
 
 enum ChartDrawingTool {
   none,
@@ -14,6 +22,7 @@ enum ChartDrawingTool {
   horizontalLine,
   verticalLine,
   parallelChannel,
+  fibonacciRetracement,
   rectangle,
 }
 

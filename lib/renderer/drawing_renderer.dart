@@ -55,6 +55,9 @@ class DrawingRenderer {
       case ChartDrawingTool.parallelChannel:
         _drawParallelChannel(canvas, drawing);
         break;
+      case ChartDrawingTool.fibonacciRetracement:
+        _drawFibonacciRetracement(canvas, drawing);
+        break;
       case ChartDrawingTool.rectangle:
         _drawRectangle(canvas, drawing);
         break;
@@ -192,6 +195,39 @@ class DrawingRenderer {
     _drawSelectionHandles(canvas, drawing, [start, end, third]);
   }
 
+  void _drawFibonacciRetracement(Canvas canvas, ChartDrawingEntity drawing) {
+    if (drawing.anchors.length < 2) {
+      _drawSelectionHandles(canvas, drawing, _anchorOffsets(drawing.anchors));
+      return;
+    }
+    final start = mapper.anchorToOffset(drawing.anchors[0]);
+    final end = mapper.anchorToOffset(drawing.anchors[1]);
+    if (start == null || end == null) {
+      return;
+    }
+
+    final left = math.min(start.dx, end.dx);
+    final right = math.max(start.dx, end.dx);
+    final paint = _strokePaint(drawing);
+    for (final level in chartDrawingFibonacciLevels) {
+      final price = _fibonacciPrice(drawing, level);
+      final y = mapper.priceToY(price);
+      if (!y.isFinite ||
+          y < mapper.mainPaneClipRect.top ||
+          y > mapper.mainPaneClipRect.bottom) {
+        continue;
+      }
+      _drawLine(
+        canvas,
+        Offset(left, y),
+        Offset(right, y),
+        paint,
+        drawing.style,
+      );
+    }
+    _drawSelectionHandles(canvas, drawing, [start, end]);
+  }
+
   void _drawRectangle(Canvas canvas, ChartDrawingEntity drawing) {
     if (drawing.anchors.length < 2) {
       _drawSelectionHandles(canvas, drawing, _anchorOffsets(drawing.anchors));
@@ -262,6 +298,12 @@ class DrawingRenderer {
 
   List<Offset> _anchorOffsets(Iterable<ChartDrawingAnchor> anchors) {
     return anchors.map(mapper.anchorToOffset).whereType<Offset>().toList();
+  }
+
+  double _fibonacciPrice(ChartDrawingEntity drawing, double level) {
+    final start = drawing.anchors[0].price;
+    final end = drawing.anchors[1].price;
+    return start + (end - start) * level;
   }
 
   void _drawRectOutline(

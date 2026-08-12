@@ -112,6 +112,8 @@ class DrawingHitTester {
         return _hitVerticalLine(point, drawing);
       case ChartDrawingTool.parallelChannel:
         return _hitParallelChannel(point, drawing);
+      case ChartDrawingTool.fibonacciRetracement:
+        return _hitFibonacciRetracement(point, drawing);
       case ChartDrawingTool.rectangle:
         return _hitRectangle(point, drawing);
       case ChartDrawingTool.none:
@@ -198,6 +200,34 @@ class DrawingHitTester {
     return _distanceToLine(point, third, parallelEnd) <= lineTolerance;
   }
 
+  bool _hitFibonacciRetracement(Offset point, ChartDrawingEntity drawing) {
+    if (drawing.anchors.length < 2) {
+      return false;
+    }
+    final start = mapper.anchorToOffset(drawing.anchors[0]);
+    final end = mapper.anchorToOffset(drawing.anchors[1]);
+    if (start == null || end == null) {
+      return false;
+    }
+
+    final left = math.min(start.dx, end.dx);
+    final right = math.max(start.dx, end.dx);
+    if (point.dx < left - lineTolerance || point.dx > right + lineTolerance) {
+      return false;
+    }
+
+    final startPrice = drawing.anchors[0].price;
+    final endPrice = drawing.anchors[1].price;
+    for (final level in chartDrawingFibonacciLevels) {
+      final price = startPrice + (endPrice - startPrice) * level;
+      final y = mapper.priceToY(price);
+      if ((point.dy - y).abs() <= lineTolerance) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   bool _hitRectangle(Offset point, ChartDrawingEntity drawing) {
     if (drawing.anchors.length < 2) {
       return false;
@@ -236,6 +266,8 @@ class DrawingHitTester {
         return drawing.anchors.take(1).map(mapper.anchorToOffset).toList();
       case ChartDrawingTool.parallelChannel:
         return drawing.anchors.take(3).map(mapper.anchorToOffset).toList();
+      case ChartDrawingTool.fibonacciRetracement:
+        return drawing.anchors.take(2).map(mapper.anchorToOffset).toList();
       case ChartDrawingTool.rectangle:
         if (drawing.anchors.length < 2) {
           return const <Offset?>[];

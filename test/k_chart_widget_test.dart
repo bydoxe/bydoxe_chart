@@ -444,6 +444,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('creates fibonacci retracement drawing from two taps',
+      (tester) async {
+    List<ChartDrawingEntity>? changedDrawings;
+    await _pumpChart(
+      tester,
+      drawingEnabled: true,
+      drawingTool: ChartDrawingTool.fibonacciRetracement,
+      onDrawingsChanged: (drawings) => changedDrawings = drawings,
+    );
+
+    final painter = _currentChartPainter(tester);
+    await tester.tapAt(Offset(80, painter.getMainY(106)));
+    await tester.pump();
+    await tester.tapAt(Offset(160, painter.getMainY(102)));
+    await tester.pump();
+
+    expect(changedDrawings, hasLength(1));
+    expect(
+      changedDrawings!.single.type,
+      ChartDrawingTool.fibonacciRetracement,
+    );
+    expect(changedDrawings!.single.anchors, hasLength(2));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('creates vertical line drawing from one tap', (tester) async {
     List<ChartDrawingEntity>? changedDrawings;
     await _pumpChart(

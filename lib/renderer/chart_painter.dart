@@ -473,6 +473,8 @@ class ChartPainter extends BaseChartPainter {
           points.add(points[2] + (points[1] - points[0]));
         }
         return _boundsFromOffsets(points);
+      case ChartDrawingTool.fibonacciRetracement:
+        return _boundsFromAnchors(mapper, drawing.anchors.take(2));
       case ChartDrawingTool.rectangle:
         return _boundsFromAnchors(mapper, drawing.anchors.take(2));
       case ChartDrawingTool.none:
@@ -1284,18 +1286,37 @@ class ChartPainter extends BaseChartPainter {
       return;
     }
 
-    final anchors = _drawingAxisAnchors(selectedDrawing);
-    if (anchors.isEmpty) {
+    final priceAnchors = _drawingPriceAxisAnchors(selectedDrawing);
+    final timeAnchors = _drawingTimeAxisAnchors(selectedDrawing);
+    if (priceAnchors.isEmpty && timeAnchors.isEmpty) {
       return;
     }
 
     final mapper = _drawingCoordinateMapper();
     final color = selectedDrawing.style.color;
-    _drawDrawingPriceAxisRange(canvas, anchors, color, mapper);
-    _drawDrawingTimeAxisRange(canvas, size, anchors, color, mapper);
+    _drawDrawingPriceAxisRange(canvas, priceAnchors, color, mapper);
+    _drawDrawingTimeAxisRange(canvas, size, timeAnchors, color, mapper);
   }
 
-  List<ChartDrawingAnchor> _drawingAxisAnchors(ChartDrawingEntity drawing) {
+  List<ChartDrawingAnchor> _drawingPriceAxisAnchors(
+    ChartDrawingEntity drawing,
+  ) {
+    if (drawing.type == ChartDrawingTool.fibonacciRetracement &&
+        drawing.anchors.length >= 2) {
+      final start = drawing.anchors[0];
+      final end = drawing.anchors[1];
+      return chartDrawingFibonacciLevels
+          .map(
+            (level) => start.copyWith(
+              price: start.price + (end.price - start.price) * level,
+            ),
+          )
+          .toList(growable: false);
+    }
+    return _drawingTimeAxisAnchors(drawing);
+  }
+
+  List<ChartDrawingAnchor> _drawingTimeAxisAnchors(ChartDrawingEntity drawing) {
     switch (drawing.type) {
       case ChartDrawingTool.horizontalLine:
       case ChartDrawingTool.verticalLine:
@@ -1304,6 +1325,7 @@ class ChartPainter extends BaseChartPainter {
       case ChartDrawingTool.extendedLine:
       case ChartDrawingTool.ray:
       case ChartDrawingTool.rectangle:
+      case ChartDrawingTool.fibonacciRetracement:
         return drawing.anchors.take(2).toList(growable: false);
       case ChartDrawingTool.parallelChannel:
         return drawing.anchors.take(3).toList(growable: false);
