@@ -41,6 +41,13 @@ class TrendLine {
   TrendLine(this.p1, this.p2, this.maxHeight, this.scale);
 }
 
+class _DrawingAxisValue {
+  final double value;
+  final double position;
+
+  const _DrawingAxisValue(this.value, this.position);
+}
+
 double? trendLineX;
 
 double getTrendLineX() {
@@ -1259,6 +1266,218 @@ class ChartPainter extends BaseChartPainter {
   @override
   void drawOverlays(Canvas canvas, Size size) {
     drawPositionLines(canvas, size);
+    _drawSelectedDrawingAxisRange(canvas, size);
+  }
+
+  void _drawSelectedDrawingAxisRange(Canvas canvas, Size size) {
+    if (!showDrawings ||
+        selectedDrawingId == null ||
+        drawings.isEmpty ||
+        datas == null ||
+        datas!.isEmpty) {
+      return;
+    }
+
+    ChartDrawingEntity? selectedDrawing;
+    for (final drawing in drawings) {
+      if (drawing.id == selectedDrawingId) {
+        selectedDrawing = drawing;
+        break;
+      }
+    }
+    if (selectedDrawing == null ||
+        selectedDrawing.hidden ||
+        selectedDrawing.type == ChartDrawingTool.none ||
+        selectedDrawing.anchors.isEmpty) {
+      return;
+    }
+
+    final anchors = _drawingAxisAnchors(selectedDrawing);
+    if (anchors.isEmpty) {
+      return;
+    }
+
+    final mapper = _drawingCoordinateMapper();
+    final color = selectedDrawing.style.color;
+    if (selectedDrawing.type != ChartDrawingTool.verticalLine) {
+      _drawDrawingPriceAxisRange(canvas, anchors, color, mapper);
+    }
+    if (selectedDrawing.type != ChartDrawingTool.horizontalLine) {
+      _drawDrawingTimeAxisRange(canvas, size, anchors, color, mapper);
+    }
+  }
+
+  List<ChartDrawingAnchor> _drawingAxisAnchors(ChartDrawingEntity drawing) {
+    switch (drawing.type) {
+      case ChartDrawingTool.horizontalLine:
+      case ChartDrawingTool.verticalLine:
+        return drawing.anchors.take(1).toList(growable: false);
+      case ChartDrawingTool.trendLine:
+      case ChartDrawingTool.extendedLine:
+      case ChartDrawingTool.ray:
+      case ChartDrawingTool.rectangle:
+        return drawing.anchors.take(2).toList(growable: false);
+      case ChartDrawingTool.parallelChannel:
+        return drawing.anchors.take(3).toList(growable: false);
+      case ChartDrawingTool.none:
+        return const <ChartDrawingAnchor>[];
+    }
+  }
+
+  void _drawDrawingPriceAxisRange(
+    Canvas canvas,
+    List<ChartDrawingAnchor> anchors,
+    Color color,
+    ChartCoordinateMapper mapper,
+  ) {
+    final values = <_DrawingAxisValue>[];
+    for (final anchor in anchors) {
+      final y = mapper.priceToY(anchor.price);
+      if (!y.isFinite || y < mMainRect.top || y > mMainRect.bottom) {
+        continue;
+      }
+      values.add(_DrawingAxisValue(anchor.price, y));
+    }
+    if (values.isEmpty) {
+      return;
+    }
+
+    values.sort((a, b) => a.position.compareTo(b.position));
+    final sideWidth = 34.0;
+    final sideLeft = verticalTextAlignment == VerticalTextAlignment.right
+        ? mWidth - sideWidth
+        : 0.0;
+    if (values.length >= 2) {
+      final rangeTop = values.first.position;
+      final rangeBottom = values.last.position;
+      canvas.drawRect(
+        Rect.fromLTRB(sideLeft, rangeTop, sideLeft + sideWidth, rangeBottom),
+        Paint()
+          ..isAntiAlias = true
+          ..style = PaintingStyle.fill
+          ..color = color.withValues(alpha: 0.18),
+      );
+    }
+
+    for (final value in values) {
+      _drawDrawingPriceAxisChip(canvas, value.value, value.position, color);
+    }
+  }
+
+  void _drawDrawingPriceAxisChip(
+    Canvas canvas,
+    double price,
+    double y,
+    Color color,
+  ) {
+    const padH = 5.0;
+    const padV = 2.0;
+    const radius = 3.0;
+    final label = formatPriceLabel(
+      price,
+      fixedLength: fixedLength,
+      tickSize: priceLabelTickSize,
+    );
+    final tp = getChipTextPainter(label, Colors.white);
+    final chipWidth = tp.width + padH * 2;
+    final chipHeight = tp.height + padV * 2;
+    final left = verticalTextAlignment == VerticalTextAlignment.right
+        ? mWidth - chipWidth
+        : 0.0;
+    final top = (y - chipHeight / 2)
+        .clamp(mMainRect.top, mMainRect.bottom - chipHeight)
+        .toDouble();
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(left, top, chipWidth, chipHeight),
+      const Radius.circular(radius),
+    );
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..isAntiAlias = true
+        ..style = PaintingStyle.fill
+        ..color = color,
+    );
+    tp.paint(canvas, Offset(left + padH, top + padV));
+  }
+
+  void _drawDrawingTimeAxisRange(
+    Canvas canvas,
+    Size size,
+    List<ChartDrawingAnchor> anchors,
+    Color color,
+    ChartCoordinateMapper mapper,
+  ) {
+    final values = <_DrawingAxisValue>[];
+    for (final anchor in anchors) {
+      final x = mapper.anchorToX(anchor);
+      if (x == null ||
+          !x.isFinite ||
+          x < mMainRect.left ||
+          x > mMainRect.right) {
+        continue;
+      }
+      values.add(_DrawingAxisValue(anchor.time.toDouble(), x));
+    }
+    if (values.isEmpty) {
+      return;
+    }
+
+    values.sort((a, b) => a.position.compareTo(b.position));
+    final top = size.height - mBottomPadding;
+    if (values.length >= 2) {
+      canvas.drawRect(
+        Rect.fromLTRB(
+            values.first.position, top, values.last.position, size.height),
+        Paint()
+          ..isAntiAlias = true
+          ..style = PaintingStyle.fill
+          ..color = color.withValues(alpha: 0.18),
+      );
+    }
+
+    for (final value in values) {
+      _drawDrawingTimeAxisChip(
+        canvas,
+        DateTime.fromMillisecondsSinceEpoch(value.value.toInt()),
+        value.position,
+        top,
+        size.width,
+        color,
+      );
+    }
+  }
+
+  void _drawDrawingTimeAxisChip(
+    Canvas canvas,
+    DateTime time,
+    double x,
+    double top,
+    double width,
+    Color color,
+  ) {
+    const padH = 5.0;
+    const padV = 2.0;
+    const radius = 3.0;
+    final label = dateFormat(time, mFormats);
+    final tp = getChipTextPainter(label, Colors.white);
+    final chipWidth = tp.width + padH * 2;
+    final chipHeight = tp.height + padV * 2;
+    final left = width <= chipWidth
+        ? 0.0
+        : (x - chipWidth / 2).clamp(0.0, width - chipWidth).toDouble();
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(left, top, chipWidth, chipHeight),
+      const Radius.circular(radius),
+    );
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..isAntiAlias = true
+        ..style = PaintingStyle.fill
+        ..color = color,
+    );
+    tp.paint(canvas, Offset(left + padH, top + padV));
   }
 
   //For TrendLine
