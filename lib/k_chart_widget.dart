@@ -33,6 +33,7 @@ typedef ChartDrawingOverlayBuilder = Widget Function(
   BuildContext context,
   ChartDrawingEntity drawing,
   Rect drawingBounds,
+  Rect chartBounds,
 );
 
 class KChartWidget extends StatefulWidget {
@@ -1080,7 +1081,7 @@ class _KChartWidgetState extends State<KChartWidget>
       return null;
     }
 
-    return builder(context, selectedDrawing, bounds);
+    return builder(context, selectedDrawing, bounds, painter.mMainRect);
   }
 
   void _preparePainterGeometry(ChartPainter painter, Size size) {

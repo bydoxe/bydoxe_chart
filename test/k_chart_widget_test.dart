@@ -286,6 +286,7 @@ void main() {
   testWidgets('builds selected drawing overlay from chart bounds',
       (tester) async {
     Rect? overlayBounds;
+    Rect? overlayChartBounds;
     await _pumpChart(
       tester,
       drawings: const [
@@ -299,8 +300,9 @@ void main() {
         ),
       ],
       selectedDrawingId: 1,
-      selectedDrawingOverlayBuilder: (context, drawing, bounds) {
+      selectedDrawingOverlayBuilder: (context, drawing, bounds, chartBounds) {
         overlayBounds = bounds;
+        overlayChartBounds = chartBounds;
         return const Positioned(
           left: 0,
           top: 0,
@@ -313,6 +315,8 @@ void main() {
     expect(overlayBounds, isNotNull);
     expect(overlayBounds!.width, greaterThan(0));
     expect(overlayBounds!.height, greaterThan(0));
+    expect(overlayChartBounds, isNotNull);
+    expect(overlayChartBounds!.width, greaterThan(overlayBounds!.width));
     expect(tester.takeException(), isNull);
   });
 
