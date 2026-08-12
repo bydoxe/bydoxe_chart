@@ -40,12 +40,14 @@ class DrawingController {
     required ChartDrawingTool tool,
     required List<ChartDrawingAnchor> anchors,
     required ChartDrawingStyle style,
+    bool locked = false,
   }) {
     return ChartDrawingEntity(
       id: id,
       type: tool,
       anchors: anchors,
       style: style,
+      locked: locked,
     );
   }
 

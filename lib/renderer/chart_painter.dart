@@ -473,7 +473,11 @@ class ChartPainter extends BaseChartPainter {
     }
   }
 
-  ChartDrawingAnchor? drawingAnchorAt(Offset point) {
+  ChartDrawingAnchor? drawingAnchorAt(
+    Offset point, {
+    ChartDrawingTool tool = ChartDrawingTool.none,
+    bool magnetEnabled = false,
+  }) {
     if (datas == null || datas!.isEmpty || !mMainRect.contains(point)) {
       return null;
     }
@@ -482,11 +486,95 @@ class ChartPainter extends BaseChartPainter {
     if (time == null) {
       return null;
     }
-    return ChartDrawingAnchor(
+    final anchor = ChartDrawingAnchor(
       time: time,
       price: mapper.yToPrice(point.dy),
       dataIndex: mapper.nearestDataIndexForX(point.dx),
     );
+    if (!magnetEnabled || tool == ChartDrawingTool.none) {
+      return anchor;
+    }
+    return _snapDrawingAnchor(point, anchor, tool, mapper);
+  }
+
+  ChartDrawingAnchor _snapDrawingAnchor(
+    Offset point,
+    ChartDrawingAnchor anchor,
+    ChartDrawingTool tool,
+    ChartCoordinateMapper mapper,
+  ) {
+    const snapThreshold = 12.0;
+    final snapX = tool != ChartDrawingTool.horizontalLine;
+    final snapY = tool != ChartDrawingTool.verticalLine;
+    var snappedAnchor = anchor;
+    var snapIndex = anchor.dataIndex;
+
+    if (snapX) {
+      final nearestIndex = mapper.nearestDataIndexForX(point.dx);
+      final nearestX = mapper.dataIndexToX(nearestIndex);
+      final nearestTime =
+          nearestIndex == null ? null : datas![nearestIndex].time;
+      if (nearestIndex != null &&
+          nearestX != null &&
+          nearestTime != null &&
+          (nearestX - point.dx).abs() <= snapThreshold) {
+        snapIndex = nearestIndex;
+        snappedAnchor = snappedAnchor.copyWith(
+          time: nearestTime,
+          dataIndex: nearestIndex,
+        );
+      }
+    }
+
+    if (snapY) {
+      final priceSnap = _nearestOhlcPriceSnap(
+        point: point,
+        mapper: mapper,
+        dataIndex: snapIndex,
+        threshold: snapThreshold,
+      );
+      if (priceSnap != null) {
+        snappedAnchor = snappedAnchor.copyWith(price: priceSnap);
+      }
+    }
+
+    return snappedAnchor;
+  }
+
+  double? _nearestOhlcPriceSnap({
+    required Offset point,
+    required ChartCoordinateMapper mapper,
+    required int? dataIndex,
+    required double threshold,
+  }) {
+    if (dataIndex == null || dataIndex < 0 || dataIndex >= datas!.length) {
+      return null;
+    }
+
+    final entity = datas![dataIndex];
+    final prices = <double>[
+      entity.open,
+      entity.high,
+      entity.low,
+      entity.close,
+    ];
+    double? nearestPrice;
+    var nearestDistance = double.infinity;
+    for (final price in prices) {
+      if (!price.isFinite) {
+        continue;
+      }
+      final distance = (mapper.priceToY(price) - point.dy).abs();
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestPrice = price;
+      }
+    }
+
+    if (nearestDistance > threshold) {
+      return null;
+    }
+    return nearestPrice;
   }
 
   ChartCoordinateMapper _drawingCoordinateMapper() {

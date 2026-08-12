@@ -81,6 +81,8 @@ class KChartWidget extends StatefulWidget {
   final int? selectedDrawingId;
   final bool showDrawings;
   final bool drawingSelectionEnabled;
+  final bool drawingMagnetEnabled;
+  final bool drawingDefaultLocked;
   final ValueChanged<int?>? onSelectedDrawingChanged;
   final ChartDrawingTool drawingTool;
   final ChartDrawingStyle drawingStyle;
@@ -140,6 +142,8 @@ class KChartWidget extends StatefulWidget {
     this.selectedDrawingId,
     this.showDrawings = true,
     this.drawingSelectionEnabled = false,
+    this.drawingMagnetEnabled = false,
+    this.drawingDefaultLocked = false,
     this.onSelectedDrawingChanged,
     this.drawingTool = ChartDrawingTool.none,
     this.drawingStyle = const ChartDrawingStyle(),
@@ -684,7 +688,11 @@ class _KChartWidgetState extends State<KChartWidget>
       return false;
     }
 
-    final anchor = painter.drawingAnchorAt(position);
+    final anchor = painter.drawingAnchorAt(
+      position,
+      tool: widget.drawingTool,
+      magnetEnabled: widget.drawingMagnetEnabled,
+    );
     if (anchor == null) {
       return true;
     }
@@ -719,6 +727,7 @@ class _KChartWidgetState extends State<KChartWidget>
           tool: tool,
           anchors: <ChartDrawingAnchor>[anchor],
           style: widget.drawingStyle,
+          locked: widget.drawingDefaultLocked,
         );
       });
       widget.onDrawingEvent?.call(
@@ -754,6 +763,7 @@ class _KChartWidgetState extends State<KChartWidget>
       tool: tool,
       anchors: anchors,
       style: widget.drawingStyle,
+      locked: widget.drawingDefaultLocked,
     );
     final drawings = DrawingController.appendDrawing(widget.drawings, drawing);
     widget.onDrawingsChanged?.call(drawings);
@@ -781,7 +791,11 @@ class _KChartWidgetState extends State<KChartWidget>
 
     final drawing =
         DrawingController.drawingById(widget.drawings, hit.drawingId);
-    final startAnchor = painter.drawingAnchorAt(position);
+    final startAnchor = painter.drawingAnchorAt(
+      position,
+      tool: drawing?.type ?? ChartDrawingTool.none,
+      magnetEnabled: widget.drawingMagnetEnabled,
+    );
     if (drawing == null || drawing.locked || startAnchor == null) {
       return false;
     }
@@ -805,16 +819,20 @@ class _KChartWidgetState extends State<KChartWidget>
       return;
     }
 
-    final currentAnchor = painter.drawingAnchorAt(position);
-    if (currentAnchor == null) {
-      return;
-    }
-
     final drawing = DrawingController.drawingById(
       session.startDrawings,
       session.drawingId,
     );
     if (drawing == null || drawing.locked) {
+      return;
+    }
+
+    final currentAnchor = painter.drawingAnchorAt(
+      position,
+      tool: drawing.type,
+      magnetEnabled: widget.drawingMagnetEnabled,
+    );
+    if (currentAnchor == null) {
       return;
     }
 
